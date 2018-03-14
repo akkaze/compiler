@@ -1,4 +1,6 @@
-class OutputIrrelevantMaker(object):
+from compiler.frontend import ASTVisitor
+
+class OutputIrrelevantMaker(ASTVisitor):
     global_scope = None
     global_variables = dict()
 
@@ -216,6 +218,7 @@ class OutputIrrelevantMaker(object):
                     node.operator == UnaryOp.SUF_INC:
                     self.side_effect += 1
                 return
+        super().visit(node)
     def is_in_collect_mode(self):
         return self.collect_set != None
     def begin_collect(self):
