@@ -5,13 +5,14 @@ from compiler.ir import *
 from compiler.utils import *
 from compiler.options import options
 from compiler.type import *
+import copy
 import logging
 
 class IRBuilder(ASTVisitor):
     stmts = None
     ast = None
-    expr_depth = 0
-
+    expr_depth = 2
+    max_depth = 0
     scope_stack = None
     current_scope = None
     current_function = None
@@ -42,6 +43,7 @@ class IRBuilder(ASTVisitor):
         self.inline_map = []
         self.inline_return_label = []
         self.inline_return_var = []
+        self.inline_no_use = Var(VariableEntity(None, None, None, None))
         self.ast = ast
         self.malloc_func = ast.scope.lookup_current_level( \
                                     LIB_PREFIX + 'malloc')
@@ -57,7 +59,7 @@ class IRBuilder(ASTVisitor):
 
     inline_ct = 0
     inline_mode = 0
-    inline_nouse = Var(VariableEntity(None, None, None, None))
+    inline_no_use = None 
     inline_map = None
     inline_return_label = None
     inline_return_var = None
@@ -136,13 +138,11 @@ class IRBuilder(ASTVisitor):
             for node in self.ast.definition_nodes:
                 if isinstance(node, VariableDefNode):
                     self.visit(node)
-
         self.visit(entity.body)
         if not isinstance(self.stmts[-1], Jump):
             self.stmts.append(Jump(end))
         self.add_label(end, entity.name + '_end')
         entity.irs = self.fetch_stmts()
-
     not_use_tmp = False
     assign_table = None
     in_dependency = None
@@ -186,14 +186,14 @@ class IRBuilder(ASTVisitor):
                         clone = copy.deepcopy(entity)
                         news_scope.insert(clone)
                         map[entity] = clone
-                self.current_scope = new_scope
-                self.scope_stack.append(self.current_scope)
+            self.current_scope = new_scope
+            self.scope_stack.append(self.current_scope)
 
-                for stmt in node.stmts:
-                    stmt.accept(self)
-                self.scope_stack.pop()
-                self.current_scope = self.scope_stack[-1]
-                return
+            for stmt in node.stmts:
+                stmt.accept(self)
+            self.scope_stack.pop()
+            self.current_scope = self.scope_stack[-1]
+            return
         elif isinstance(node, IfNode):
             then_label = Label()
             else_label = Label()
@@ -264,17 +264,18 @@ class IRBuilder(ASTVisitor):
             return
         elif isinstance(node, AssignNode):
             lhs = self.visit_expr(node.lhs)
-            rhs = self.visit_expr(node.rhs)
+            rhs = None
             if not self.need_return and \
                 options.enable_output_irrelevant_elimination and \
-                node.output_irrelevant:
+                node.is_output_irrelevant:
                 if options.print_remove_info:
                     logging.error('! remove assign ' + str(node.location))
                 return
             if options.enable_common_assign_elimination and \
                 isinstance(lhs, Var):
+                entity = lhs.entity
                 ret = self.expr_hashing(node.rhs)
-                if ret.first and not isinstance(node.rhs, IntegerLiteralNode):
+                if ret[0] and not isinstance(node.rhs, IntegerLiteralNode):
                     same = self.assign_table.get(ret.second)
                     if not same:
                         for dep in self.get_dependency(node.rhs):
@@ -284,7 +285,7 @@ class IRBuilder(ASTVisitor):
                         rhs = Var(same)
             if not rhs:
                 self.not_use_tmp = True
-                self.rhs = self.visit_expr(node.rhs)
+                rhs = self.visit_expr(node.rhs)
                 self.not_use_tmp = False
             self.add_assign(lhs, rhs)
             return lhs
@@ -366,7 +367,7 @@ class IRBuilder(ASTVisitor):
         elif isinstance(node, LogicalOrNode):
             goon = Label()
             end = Label()
-            tmp = self.nw_int_tmp()
+            tmp = self.new_int_tmp()
             self.add_assign(tmp, self.visit_expr(node,left))
             self.stmts.append(CJump(tmp, end, goon))
             self.add_label(goon, 'goon')
@@ -397,14 +398,14 @@ class IRBuilder(ASTVisitor):
                 if options.print_inline_info and \
                     entity == self.current_function:
                     logging.error(entity.name + ' is self expanded')
-                if self.need_return():
+                if self.need_return:
                     tmp = self.new_int_tmp()
                     self.inline_function(entity, tmp, args)
                     return tmp
                 else:
                     self.inline_function(entity, self.inline_nouse, args)
             else:
-                if self.need_return():
+                if self.need_return:
                     if self.not_use_tmp:
                         return Call(entity, args)
                     else:
@@ -450,9 +451,11 @@ class IRBuilder(ASTVisitor):
                 if self.inline_mode > 0:
                     entity = self.inline_map[-1][node.entity]
                     if entity:
-                        return entity
+                        return Var(entity)
                     else:
-                        return node.entity
+                        return Var(node.entity)
+                else:
+                    return Var(node.entity)
         elif isinstance(node, MemberNode):
             base = self.visit_expr(node.expr)
             offset = node.entity.offset
@@ -515,21 +518,22 @@ class IRBuilder(ASTVisitor):
                 else:
                     return Unary(UnaryOp.LOGIC_NOT, \
                                 self.visit_expr(node.expr))
-        elif isinstance(node, ExprNode):
-            if self.expr_depth == 0:
-                self.tmp_top = 0
-                self.max_depth = 0
-            if not node:
-                return
-            self.expr_depth += 1
-            if self.max_depth < self.expr_depth:
-                self.max_depth = self.expr_depth
-            expr = node.accept(self)
-            self.expr_depth -= 1
-            return expr
+        super().visit(node)
+    
+    def visit_expr(self, node):
+        if self.expr_depth == 0:
+            self.tmp_top = 0
+            self.max_depth = 0
+        if not node:
+            return
+        self.expr_depth += 1
+        if self.max_depth < self.expr_depth:
+            self.max_depth = self.expr_depth
+        expr = node.accept(self)
+        self.expr_depth -= 1
+        return expr
 #        elif isinstance(node, StmtNode):
 #            node.accept(self)
-        super().visit(node)
 
     def expand_creator(self, expr, base, now, type, constructor):
         tmps = self.new_int_tmp()
@@ -605,13 +609,13 @@ class IRBuilder(ASTVisitor):
             self.stmts.append(Jump(begin_label))
         self.add_label(end_label, 'loop_end')
     def expr_hashing(self, node):
-        if isinstance(node, BinaryNode):
+        if isinstance(node, BinaryOpNode):
             left = self.expr_hashing(node.left)
             right = self.expr_hashing(node.right)
-            if left.first and right.first:
+            if left[0] and right[0]:
                 hash_code = hash(node.operator)
-                hash_code += left.second
-                hash_code += right.second ^ 0x5D
+                hash_code += left[1]
+                hash_code += right[1] ^ 0x5D
                 return (True, hash_code)
             else:
                 return (False, 0)
@@ -621,6 +625,7 @@ class IRBuilder(ASTVisitor):
             return (True, hash(node.value))
         else:
             return (False, 0)
+    @property
     def need_return(self):
         return self.expr_depth > 1
     def fetch_stmts(self):

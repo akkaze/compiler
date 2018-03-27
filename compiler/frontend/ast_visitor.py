@@ -1,16 +1,19 @@
+from compiler.ast import *
+from compiler.entity import *
+
 class ASTVisitor(object):
     def visit_stmt(self, stmt):
-        stmt.accept(self)
+        return stmt.accept(self)
     def visit_stmts(self, stmts):
         for stmt in stmts:
             self.visit_stmt(stmt)
     def visit_expr(self, expr):
-        expr.accept(expr)
+        return expr.accept(self)
     def visit_exprs(self, exprs):
         for expr in exprs:
             self.visit_expr(exprs)
     def visit_definition(self, ddef):
-        ddef.accpet(self)
+        ddef.accept(self)
     def visit_definitions(self, ddefs):
         for ddef in ddefs:
             self.visit_definition(ddef)
@@ -20,6 +23,13 @@ class ASTVisitor(object):
             return
         elif isinstance(node, ExprStmtNode):
             self.visit_expr(node.expr)
+            return
+        elif isinstance(node, IfNode):
+            self.visit_expr(node.cond)
+            if node.then_body:
+                self.visit_expr(node.then_body)
+            if node.else_body:
+                self.visit_expr(node.else_body)
             return
         elif isinstance(node, BreakNode):
             return
@@ -44,6 +54,10 @@ class ASTVisitor(object):
             self.visit_expr(node.lhs)
             self.visit_expr(node.rhs)
             return
+        elif isinstance(node, FuncallNode):
+            self.visit_expr(node.expr)
+            self.visit_exprs(node.args)
+            return
         elif isinstance(node, ArefNode):
             self.visit_expr(node.expr)
             self.visit_expr(node.index)
@@ -53,7 +67,7 @@ class ASTVisitor(object):
                 self.visit_exprs(node.exprs)
             return
         elif isinstance(node, MemberNode):
-            self.visit_expr(node.epxr)
+            self.visit_expr(node.expr)
             return
         elif isinstance(node, VariableNode):
             return
