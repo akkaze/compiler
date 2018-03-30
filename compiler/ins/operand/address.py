@@ -1,15 +1,17 @@
+from compiler.ins.operand import Operand
+
 class Address(Operand):
     base = None
     index = None
     mul = 1
     add = 0
-    show_size = True
-    base_nasm = None
-    index_nasm = None
+    show_size = False
+    m_base_nasm = None
+    m_index_nasm = None
     def __init__(self, *args):
         if len(args) == 1:
             self.base = args[0]
-            if isinstance(base, Address):
+            if isinstance(self.base, Address):
                 raise InternalError('nested address')
         elif len(args) == 4:
             self.base = args[0]
@@ -28,20 +30,22 @@ class Address(Operand):
             ret |= self.index.get_all_ref()
         return ret
 
-    def replace(self, from, to):
+    def replace(self, ffrom, to):
         if self.base:
-            self.base = self.base.replace(from, to)
+            self.base = self.base.replace(ffrom, to)
         elif self.index:
-            self.index = self.index.replace(from, to)
+            self.index = self.index.replace(ffrom, to)
         return self
 
     @property
     def base_nasm(self):
-        if self.base_nasm:
-            return self.base_nasm
+        if self.m_base_nasm:
+            return self.m_base_nasm
         else:
-
-            return base
+            return self.base
+    @base_nasm.setter
+    def base_nasm(self, value):
+        self.m_base_nasm = value
     @property
     def base_only(self):
         if self.base and self.index and \
@@ -103,13 +107,13 @@ class Address(Operand):
         else:
             ret += '['
         if self.base:
-            ret += gap + self.base_nasm.nasm
+            ret += gap + str(self.base)
             gap = ' + '
         if self.index:
-            ret += gap + self.index_nasm.nasm
+            ret += gap + str(self.index)
             gap = ' + '
             if self.mul != 1:
                 ret += ' * ' + str(self.mul)
         if self.add != 0:
-            ret += gap + str(self.add)
+            ret += (gap + str(self.add))
         return ret + ']'
