@@ -8,6 +8,8 @@ from compiler.type import *
 import copy
 import logging
 
+global options
+
 class IRBuilder(ASTVisitor):
     stmts = None
     ast = None
@@ -97,7 +99,6 @@ class IRBuilder(ASTVisitor):
         self.inline_return_var.pop()
 
     def generate_ir(self):
-        global options
         for class_entity in self.ast.class_entities:
             class_entity.init_offset(options.CLASS_MEMBER_ALIGNMENT_SIZE)
 
@@ -111,6 +112,7 @@ class IRBuilder(ASTVisitor):
         for function_entity in self.ast.function_entities:
             self.tmp_stack = []
             self.tmp_top = 0
+            self.current_function = function_entity
             if function_entity.name != 'main':
                 function_entity.asm_name = entity_name + '__func__'
             self.compile_function(function_entity)
@@ -158,7 +160,6 @@ class IRBuilder(ASTVisitor):
             ret.add(node.entity)
         return ret
     def visit(self, node):
-        global options
         if isinstance(node, FunctionDefNode):
             raise InternalError('invaild call to visit FunctionDefNode')
         elif isinstance(node, ClassDefNode):
@@ -198,22 +199,21 @@ class IRBuilder(ASTVisitor):
             then_label = Label()
             else_label = Label()
             end_label = Label()
-
             if not node.else_body:
                 self.add_cjump(node.end, then_label, end_label)
                 self.add_label(then_label, 'if_then')
                 if node.then_body:
-                    self.visit(node.then_body)
+                    self.visit_stmt(node.then_body)
                 self.add_label(end_label, 'if_end')
             else:
                 self.add_cjump(node.cond, then_label, else_label)
                 self.add_label(then_label, 'if_then')
                 if node.then_body:
-                    self.visit(node.then_body)
+                    self.visit_stmt(node.then_body)
                 self.stmts.append(Jump(end_label))
                 self.add_label(else_label, 'if_else')
                 if node.else_body:
-                    self.visit(node.else_body)
+                    self.visit_stmt(node.else_body)
                 self.add_label(end_label, 'if_end')
             return
         elif isinstance(node, WhileNode):
@@ -250,14 +250,14 @@ class IRBuilder(ASTVisitor):
                     self.add_assign(self.inline_return_var[-1], \
                         self.visit_expr(node.expr))
                     self.stmts.append(Jump(self.inline_return_label[-1]))
+            else:
+                if node.expr:
+                    self.stmts.append(Return(self.visit_expr(node.expr)))
                 else:
-                    if node.expr:
-                        self.stmts.append(Return(self.visit_expr(node.expr)))
-                    else:
-                        self.stmts.append(Return(None))
-                    self.stmts.append(\
-                        Jump(self.current_function.end_label_ir))
-            self.expr_depth += 1
+                    self.stmts.append(Return(None))
+                self.stmts.append(\
+                    Jump(self.current_function.end_label_ir))
+            self.expr_depth -= 1
             return
         elif isinstance(node, ExprStmtNode):
             self.visit_expr(node.expr)
@@ -290,8 +290,8 @@ class IRBuilder(ASTVisitor):
             self.add_assign(lhs, rhs)
             return lhs
         elif isinstance(node, BinaryOpNode):
-            lhs = node.left
-            rhs = node.right
+            lhs = self.visit_expr(node.left)
+            rhs = self.visit_expr(node.right)
             if not self.need_return:
                 return
             if isinstance(lhs, IntConst) and isinstance(rhs, IntConst):
@@ -351,6 +351,48 @@ class IRBuilder(ASTVisitor):
                
                 else:
                     raise InternalError('')
+            if not node.left.type.is_string:
+                op = None
+                if node.operator == BinaryOpNode.BinaryOp.ADD:
+                    op = Binary.BinaryOp.ADD
+                elif node.operator == BinaryOpNode.BinaryOp.SUB:
+                    op = Binary.BinaryOp.SUB
+                elif node.operator == BinaryOpNode.BinaryOp.MUL:
+                    op = Binary.BinaryOp.MUL
+                elif node.operator == BinaryOpNode.BinaryOp.DIV:
+                    op = Binary.BinaryOp.DIV
+                elif node.operator == BinaryOpNode.BinaryOp.MOD:
+                    op = Binary.BinaryOp.MOD
+                elif node.operator == BinaryOpNode.BinaryOp.LSHIFT:
+                    op = Binary.BinaryOp.LSHIFT
+                elif node.operator == BinaryOpNode.BinaryOp.RSHIFT:
+                    op = Binary.BinaryOp.RSHIFT
+                elif node.operator == BinaryOpNode.BinaryOp.BIT_AND:
+                    op = Binary.BinaryOp.BIT_AND
+                elif node.operator == BinaryOpNode.BinaryOp.BIT_OR:
+                    op = Binary.BinaryOp.BIT_OR
+                elif node.operator == BinaryOpNode.BinaryOp.BIT_XOR:
+                    op = Binary.BinaryOp.BIT_XOR
+                elif node.operator == BinaryOpNode.BinaryOp.LOGIC_AND:
+                    op = Binary.BinaryOp.BIT_AND
+                elif node.operator == BinaryOpNode.BinaryOp.LOGIC_OR:
+                    op = Binary.BinaryOp.BIT_OR
+                elif node.operator == BinaryOpNode.BinaryOp.GT:
+                    op = Binary.BinaryOp.GT
+                elif node.operator == BinaryOpNode.BinaryOp.LT:
+                    op = Binary.BinaryOp.LT
+                elif node.operator == BinaryOpNode.BinaryOp.GE:
+                    op = Binary.BinaryOp.GE
+                elif node.operator == BinaryOpNode.BinaryOp.LE:
+                    op = Binary.BinaryOp.LE
+                elif node.operator == BinaryOpNode.BinaryOp.EQ:
+                    op = Binary.BinaryOp.EQ
+                elif node.operator == BinaryOpNode.BinaryOp.NE:
+                    op = Binary.BinaryOp.NE
+                else:
+                    raise InternalError(node.location, \
+                        'unsupported operator for int : ' + str(node.operator))
+                return Binary(lhs, op, rhs)
         elif isinstance(node, LogicalAndNode):
             goon = Label()
             end = Label()
@@ -492,32 +534,54 @@ class IRBuilder(ASTVisitor):
                     return
         elif isinstance(node, UnaryOpNode):
             op = node.operator
-            if op == UnaryOp.ADD:
+            if op == UnaryOpNode.UnaryOp.ADD:
                 if isinstance(node.expr, IntegerLiteralNode):
                     return IntConst(node.expr.value)
                 else:
                     return self.visit_expr(node.expr)
-            elif op == UnaryOp.MINUS:
+            elif op == UnaryOpNode.UnaryOp.MINUS:
                 if isinstance(node.expr, IntegerLiteralNode):
                     return IntConst(-node.expr.value)
                 else:
-                    return Unary(UnaryOp.MINUS, \
+                    return Unary(Unary.UnaryOp.MINUS, \
                                 self.visit_expr(node.expr))
-            elif op == UnaryOp.BIT_NOT:
+            elif op == UnaryOpNode.UnaryOp.BIT_NOT:
                 if isinstance(node.expr, IntegerLiteralNode):
                     return IntConst(~node.expr.value)
                 else:
-                    return Unary(UnaryOp.BIT_NOT, \
+                    return Unary(Unary.UnaryOp.BIT_NOT, \
                                 self.visit_expr(node.expr))
-            elif op == UnaryOp.LOGIC_NOT:
+            elif op == UnaryOpNode.UnaryOp.LOGIC_NOT:
                 if isinstance(node.expr, IntegerLiteralNode):
                     if node.expr.value == 1:
                         return IntConst(1)
                     else:
                         return IntConst(0)
                 else:
-                    return Unary(UnaryOp.LOGIC_NOT, \
+                    return Uinary(Uinary.UnaryOp.LOGIC_NOT, \
                                 self.visit_expr(node.expr))
+            elif op == UnaryOpNode.UnaryOp.SUF_INC or \
+                op == UnaryOpNode.UnaryOp.SUF_DEC:
+                opr = None
+                if op == UnaryOpNode.UnaryOp.SUF_INC:
+                    opr = Binary.BinaryOp.ADD
+                else:
+                    opr = Binary.BinaryOp.SUB
+                expr = self.visit_expr(node.expr)
+                if True or isinstance(node.expr, VariableNode):
+                    if self.need_return:
+                        tmp = self.new_int_tmp()
+                        self.add_assign(tmp, expr)
+                        self.add_assign(expr, \
+                            Binary(expr, opr, self.const_one))
+                        return tmp
+                    else:
+                        self.add_assign(expr, \
+                            Binary(expr, opr, self.const_one))
+                        return
+            else:
+                raise InternalError(node.location, \
+                    'invalid operator ' + str(op))
         super().visit(node)
     
     def visit_expr(self, node):
@@ -640,7 +704,6 @@ class IRBuilder(ASTVisitor):
         else:
             raise InternalError('get address on an invalid type')
     def add_assign(self, lhs, rhs):
-        global options
         if options.enable_common_assign_elimination and \
             isinstance(lhs, Var):
             if lhs.entity in self.in_dependency:
@@ -652,7 +715,6 @@ class IRBuilder(ASTVisitor):
         self.label_counter += 1
         self.stmts.append(label)
     def add_cjump(self, cond, true_label, false_label):
-        global options
         if options.enable_cjump_optimization:
             if isinstance(cond, BinaryOpNode):
                 node = cond
@@ -672,7 +734,8 @@ class IRBuilder(ASTVisitor):
                     self.stmts.append(CJump(self.visit(cond), 
                                         true_label, false_label))
                     self.expr_depth -= 1
-            elif isinstance(cond, UnaryOpNode) and cond.oprator == LOG_NOT:
+            elif isinstance(cond, UnaryOpNode) and \
+                cond.oprator == Unary.UnaryOp.LOGIC_NOT:
                 self.add_cjump(cond.expr, false_label, true_label)
             elif isinstance(cond, BoolLiteralNode):
                 if cond.value:
@@ -696,16 +759,16 @@ class IRBuilder(ASTVisitor):
     tmp_top = 0
     new_int_tmp_counter = 0
     def new_int_tmp(self):
-        global options
         if options.enable_global_register_allocation:
             tmp = VariableEntity(None, IntegerType(),
                                 'tmp' + str(self.new_int_tmp_counter), None)
             self.new_int_tmp_counter += 1
+            self.current_function.scope.insert(tmp)
             return Var(tmp)
         else:
             if self.tmp_top >= len(self.tmp_stack):
                 tmp = VariableEntity(None, IntegerType(),
-                                'tmp' + self.tmp_top, None)
+                                'tmp' + str(self.tmp_top), None)
             self.current_function.scope.insert(tmp)
             self.tmp_stack.append(Var(tmp))
             tmp = self.tmp_stack[self.tmp_top]

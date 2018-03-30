@@ -106,7 +106,7 @@ class ControlFlowAnalyzer:
                     continue
                 last = to_remove.ins[1]
                 if len(to_remove.ins) == 2 and isinstance(last, Jmp):
-                    backup = to_remove.predecessor
+                    backup = copy.deepycopy(to_remove.predecessor)
                     for pre in backup:
                         jump = pre.ins[len(pre.ins) - 1]
                         if isinstance(jump, Jmp):

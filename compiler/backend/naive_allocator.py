@@ -38,13 +38,11 @@ class NaiveAllocator:
             for ins in bb.ins:
                 for ref in ins.use:
                     ref.ref_times += 1
-                    all_ref.append(ref)
+                    all_ref.add(ref)
                 for ref in ins.ddef:
                     ref.ref_times += 1
-                    all_ref.append(ref)
-        
+                    all_ref.add(ref)
         to_sort = sorted(all_ref, key = lambda x: -x.ref_times)
-
         to_allocate = [1, 12, 13, 14, 15]
         if options.print_naive_allocator_info:
             logging.error('naive allocator : ' + entity.name)
@@ -54,13 +52,20 @@ class NaiveAllocator:
                 if ref.type == Reference.Type.GLOBAL:
                     continue
 
-                ref.reg = self.registers[to_allocate[i]]
+                ref.set_register(self.registers[to_allocate[i]])
                 entity.reg_used.append(self.registers[to_allocate[i]])
 
                 if options.print_naive_allocator_info:
                     logging.error(ref.name + ' -> ' + str(ref.reg))
         entity.reg_used.append(self.rbp)
 
+        # === Frame layout === 
+        # virtual stack
+        # local variable
+        # parameter
+        # -----------------<-bp
+        # save regs
+        # return address
         lvar_base = 0
         stack_base = 0
         saved_temp_base = 0
@@ -77,6 +82,7 @@ class NaiveAllocator:
         stack_base += entity.scope.locate_local_variable(\
                         lvar_base, options.STACK_VAR_ALIGNMENT_SIZE)
         for var in entity.scope.all_local_variables():
+            print(var.reference)
             var.reference.set_offset(-var.offset, self.rbp)
 
         tmp_stack = entity.tmp_stack
