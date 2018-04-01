@@ -1,5 +1,5 @@
-from compiler.ir import Instruction
-
+from compiler.ins import Instruction
+from enum import Enum
 class Cmp(Instruction):
     class Operator(Enum):
         EQ = 1
@@ -16,24 +16,28 @@ class Cmp(Instruction):
         self.left = left
         self.right = right
         self.operator = operator
+        super().__init__()
 
-    def replace_use(self, from, to):
-        right = right.replace(from, to)
-        if self.left != from:
-            self.left = self.left.replace(from, to)
-    def replace_def(self, from, to):
-        self.left = self.left.replace(from, to)
-    def replace_all(self, from, to):
-        self.left = self.left.replace(from, to)
-        self.right = self.right.replace(from, to)
+    def replace_use(self, ffrom, to):
+        right = right.replace(ffrom, to)
+        if self.left != ffrom:
+            self.left = self.left.replace(ffrom, to)
+    def replace_def(self, ffrom, to):
+        self.left = self.left.replace(ffrom, to)
+    def replace_all(self, ffrom, to):
+        self.left = self.left.replace(ffrom, to)
+        self.right = self.right.replace(ffrom, to)
 
     def calc_def_and_use(self):
         if isinstance(self.left, Reference):
-            self.ddef |= self.left.get_all_ref()
-        self.use |= self.left.get_all_ref()
-        self.use |= self.right.get_all_ref()
-        self.all_ref |= self.use
-        self.all_ref |= self.ddef
+            self.m_ddef |= self.left.get_all_ref()
+        self.m_use |= self.left.get_all_ref()
+        self.m_use |= self.right.get_all_ref()
+        self.m_all_ref |= self.m_use
+        self.m_all_ref |= self.m_ddef
 
+    def accept(self, translator):
+        return translator.visit(self)
+ 
     def __str__(self):
         return 'cmp ' + str(self.left) + ', ' + str(self.right)

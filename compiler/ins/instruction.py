@@ -7,15 +7,18 @@ class Instruction(ABC):
     iin = None
     out = None
 
-    use = None
-    ddef = None
+    m_use = None
+    m_ddef = None
 
-    all_ref = None
+    m_all_ref = None
     live = None
 
     def __init__(self):
-        self.predecessor = dict()
-        self.successor = dict()
+        self.predecessor = []
+        self.successor = []
+        self.iin = dict()
+        self.out = dict()
+    
     @abstractmethod
     def replace_use(self, ffrom, to):
         pass
@@ -30,29 +33,29 @@ class Instruction(ABC):
 
     @property
     def use(self):
-        if not self.use:
+        if not self.m_use:
             self.init_def_and_use()
             self.calc_def_and_use()
-        return self.use
+        return self.m_use
 
     @property
     def ddef(self):
-        if not self.ddef:
+        if not self.m_ddef:
             self.init_def_and_use()
             self.calc_def_and_use()
-        return self.ddef
-
+        return self.m_ddef
+    
     def init_def_and_use(self):
-        self.use = dict()
-        self.ddef = dict()
-        self.all_ref = dict()
+        self.m_use = set()
+        self.m_ddef = set()
+        self.m_all_ref = set()
     
     @property
     def all_ref(self):
-        if not self.all_ref:
+        if not self.m_all_reff:
             self.init_def_and_use()
             self.calc_def_and_use()
-        return self.all_ref
+        return self.m_all_reff
 
 
     @abstractmethod

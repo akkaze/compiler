@@ -1,4 +1,5 @@
-from compiler.ir import Instruction
+from compiler.ins import Instruction
+from enum import Enum
 
 class CJump(Instruction):
     class Type(Enum):
@@ -21,7 +22,7 @@ class CJump(Instruction):
     def __init__(self, *args):
         self.bring_out = set()
         if len(args) == 3:
-            self.type = Type.BOOL
+            self.type = CJump.Type.BOOL
             self.cond = args[0]
             if isinstance(cond, Immediate):
                 raise InternalError('')
@@ -33,60 +34,64 @@ class CJump(Instruction):
             self.type = args[2]
             self.true_label = args[3]
             self.false_label = args[4]
-    def replace_use(self, from, to):
-        if self.bring_out and (from in self.bring_out):
+        super().__init__()
+    def replace_use(self, ffrom, to):
+        if self.bring_out and (ffrom in self.bring_out):
             new_bring_out = set()
             for reference in self.bring_out:
-                new_bring_out.add(reference.replace(from, to))
+                new_bring_out.add(reference.replace(ffrom, to))
             self.bring_out = new_bring_out
         
-        if self.type == Type.BOOL:
-            self.cond = self.cond.replace(from, to)
+        if self.type == CJump.Type.BOOL:
+            self.cond = self.cond.replace(ffrom, to)
         else:
-            self.left = self.left.replace(from, to)
-            self.right = self.right.replace(from, to)
-    def replace_def(self, from, to):
-        if self.type == Type.BOOL:
-            self.use |= self.cond.get_all_ref()
+            self.left = self.left.replace(ffrom, to)
+            self.right = self.right.replace(ffrom, to)
+    def replace_def(self, ffrom, to):
+        pass
+    def calc_def_and_use(self):
+        if self.type == CJump.Type.BOOL:
+            self.m_use |= self.cond.get_all_ref()
         else:
-            self.use |= self.left.get_all_ref()
-            self.use |= self.right.get_all_ref()
+            self.m_use |= self.left.get_all_ref()
+            self.m_use |= self.right.get_all_ref()
         if self.bring_out:
-            self.use |= self.bring_out
-        self.add_ref |= self.use
+            self.m_use |= self.bring_out
+        self.m_all_ref |= self.m_use
     @property
     def name(self):
-        if self.type == Type.EQ:
+        if self.type == CJump.Type.EQ:
             return 'je'
-        elif self.type == Type.NE:
+        elif self.type == CJump.Type.NE:
             return 'jne'
-        elif self.type == Type.GT:
+        elif self.type == CJump.Type.GT:
             return 'jg'
-        elif self.type == Type.GE:
+        elif self.type == CJump.Type.GE:
             return 'jge'
-        elif self.type == Type.LT:
+        elif self.type == CJump.Type.LT:
             return 'jl'
-        elif self.type == Type.LE:
+        elif self.type == CJump.Type.LE:
             return 'jle'
         else:
             raise InternalError('invalid compare operator')
-    @property
-    def not_name(self):
-        if self.type == Type.EQ:
+    @staticmethod
+    def not_name(raw):
+        if raw == 'je':
             return 'jne'
-        elif self.type == Type.NE:
+        elif raw == 'jne':
             return 'je'
-        elif self.type == Type.GT:
+        elif raw == 'jg':
             return 'jle'
-        elif self.type == Type.GE:
+        elif raw == 'jge':
             return 'jl'
-        elif self.type == Type.LT:
+        elif raw == 'jl':
             return 'jge'
-        elif self.type == Type.LE:
+        elif raw == 'jle':
             return 'jg'
         else:
             raise InternalError('invalid compare operator')
-    @static_method
+
+    @staticmethod
     def relect(raw):
         if raw == 'je':
             return 'je'
@@ -96,14 +101,17 @@ class CJump(Instruction):
             return 'jl'
         elif raw == 'jge':
             return 'jle'
-        elif raw == 'jl'
+        elif raw == 'jl':
             return 'jg'
         elif raw == 'jle':
             return 'jge'
         else:
             raise InternalError('invalid compare operator')
+    def accept(self, translator):
+        return translator.visit(self)
+ 
     def __str__(self):
-        if self.type == Type.BOOL:
+        if self.type == CJump.Type.BOOL:
             return 'Cjump ' + str(self.cond) + ', ' + \
                     str(self.true_label) + ', ' + str(self.false_label)
         else:

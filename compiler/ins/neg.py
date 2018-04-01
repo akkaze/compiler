@@ -4,19 +4,23 @@ class Neg(Instruction):
     operand = None
     def __init__(self, operand):
         self.operand = operand
-    def replace_use(self, from, to):
+        super().__init__()
+    def replace_use(self, ffrom, to):
         if not isinstance(self.operand, Reference):
-            self.operand = self.operand.replace(from, to)
-    def replace_def(self, from, to):
+            self.operand = self.operand.replace(ffrom, to)
+    def replace_def(self, ffrom, to):
         if isinstance(self.operand, Reference):
-            self.operand = self.operand.replace(from, to)
-    def replace_all(self, from, to):
-        self.operand = self.operand.replace(from, to)
+            self.operand = self.operand.replace(ffrom, to)
+    def replace_all(self, ffrom, to):
+        self.operand = self.operand.replace(ffrom, to)
     def calc_def_and_use(self):
         if isinstance(self.operand, Reference):
-            self.ddef |= self.operand.get_all_ref()
-        self.use |= self.operand.get_all_ref()
-        self.all_ref |= self.use
-        self.all_ref |= self.ddef
+            self.m_ddef |= self.operand.get_all_ref()
+        self.m_use |= self.operand.get_all_ref()
+        self.m_all_ref |= self.m_use
+        self.m_all_ref |= self.m_ddef
+    def accept(self, translator):
+        return translator.visit(self)
+ 
     def __str__(self):
         return 'neg ' + str(self.operand) 
