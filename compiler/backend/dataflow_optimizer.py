@@ -76,7 +76,6 @@ class DataFlowAnalyzer:
                 del self.expr_table[left]
                 break
         if to_remove in self.copy_table:
-            print('oops')
             del self.copy_table[to_remove]
         to_removes = []
         for left, right in self.copy_table.items():
@@ -95,22 +94,27 @@ class DataFlowAnalyzer:
         for ffrom,to in self.copy_table.items():
             operand = operand.replace(ffrom, to)
         return operand
+    # create a new copy reference and a instruction that copy dest into it
     def transform_move(self, dest, src, to_add):
         copy = Reference('tmp_copy_' + str(self.tmp_ct), \
                 Reference.Type.UNKNOWN)
         self.tmp_ct += 1
+        # src -> copy
         self.put_copy(copy, src)
+        # src -> dest
         self.put_copy(dest, src)
         to_add.append(Move(copy, dest))
         self.current_function.tmp_stack.append(copy)
     def transform_expr(self, dest, expr, to_add):
-        copy = Reference('tmp_copy+' + str(self.tmp_ct), \
+        copy = Reference('tmp_copy_' + str(self.tmp_ct), \
                 Reference.Type.UNKNOWN)
+        self.tmp_ct += 1
+        # expr -> copy
         self.put_expr(copy, expr)
+        # copy -> dest
         self.put_copy(dest, copy)
         to_add.append(Move(copy, dest))
         self.current_function.tmp_stack.append(copy)
-    dead_code_ct = 0
 
     def common_subexpression_elimination(self, entity):
         for bb in entity.bbs:
@@ -119,28 +123,37 @@ class DataFlowAnalyzer:
             new_ins = []
             for ins in bb.ins:
                 to_add = []
-                if isinstance(ins, Move):
-                    if ins.dest.is_address:
+                if isinstance(ins, Move):                   # store
+                    if ins.dest.is_address:                
                         self.expr_table.clear()
                         self.copy_table.clear()
-                    elif ins.is_ref_move:
-                        src = self.replace_copy(src)
+                    elif ins.is_ref_move:                   # mov ref1, ref2
+                        # if ref1 is already occur as source of some copy instruction
+                        # replace it as the dest as this instruction
+                        # then an extra reference can be saved
+                        src = self.replace_copy(ins.src)
+                        # move ref2 into a copy reference
                         self.transform_move(dest, src, to_add)
-                    else:
-                        src = ins.src
+                    else:                                   # load ref1, expr 
+                        src = self.replace_copy(ins.src)
                         dest = ins.dest
-                        expr_src  = Expression('unary', src, None)
+                        # create a expression on behalf of expr
+                        expr_src = Expression('unary', src, None)
+                        # lookup it in the expr table
                         res = self.expr_table.get(expr_src)
                         if not res:
+                            # not found
+                            # put it into the expr_table
                             self.transform_expr(dest, expr_src, to_add)
                         else:
+                            # found, directly move previous copy reference into dest
                             ins = Move(dest, res)
                             self.transform_move(dest, res, to_add)
                 elif isinstance(ins, Bin):
-                    if ins.left.is_address:
+                    if ins.left.is_address:                 # add [ref1], ref2
                         self.expr_table.clear()
                         self.copy_table.clear()
-                    else:
+                    else:                                   # add ref1, 12
                         dest = ins.left
                         src1 = self.replace_copy(dest)
                         src2 = self.replace_copy(ins.right)
@@ -175,12 +188,12 @@ class DataFlowAnalyzer:
         value = 0
         if operand.is_const_int:
             is_constant = True
-            valu = operand.value
+            value = operand.value
         else:
             find = self.constant_table.get(operand)
             if find:
                 is_constant = True
-                value = find.int_value
+                value = find
             if isinstance(operand, Address):
                 self.replace_address(operand)
         return (is_constant, value)
@@ -234,11 +247,11 @@ class DataFlowAnalyzer:
                             raise InternalError('\
                             invalid operator in constant propagation')
                         self.constant_table[ins.left] = value
-                        new_ins.append(Move(left, Immediate(value)))
+                        new_ins.append(Move(ins.left, Immediate(value)))
                     else:
                         if left[0]:
                             self.constant_table.remove(ins.left)
-                            new_ins.append(ins)
+                        new_ins.append(ins)
                 elif isinstance(ins, Lea):
                     self.replace_address(ins.addr)
                     dest = self.get_constant(ins.dest)
@@ -250,6 +263,8 @@ class DataFlowAnalyzer:
                     self.constant_table.clear()
                     new_ins.append(ins)
             bb.ins = new_ins
+    
+    dead_code_ct = 0
     def dead_code_elimination(self, bb):
         new_ins = []
         for ins in bb.ins:
@@ -280,7 +295,7 @@ class DataFlowAnalyzer:
         self.sorted = []
         self.visited = set()
         for i in range(len(entity.bbs) - 1, -1, -1):
-            pre = entity.bbs[i ]
+            pre = entity.bbs[i]
             if pre not in self.visited:
                 self.dfs_sort(pre)
     def liveness_analysis(self,entity):
