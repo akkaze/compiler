@@ -1,25 +1,29 @@
-from abc import ABCMeta, abstract_method, abstract_property
-from compiler.ast import ExprNode, Location
-from compiler.ins.operand  import Reference
-from compiler.type import Type
-from compiler.utils import InternalError
+from abc import ABC, abstractmethod, abstractproperty
 
-class Entity(meta=ABCMeta):
+class Entity(ABC):
     location = None
     name = None
     type = None
     offset = 0
     reference = None
     
-    dependence = []
+    dependence = None
     is_output_irrelevant = False
     
     def __init__(self, loc, type, name):
         self.location = loc
         self.type = type
         self.name = name
-        
+        self.dependence = []
+
     def add_dependence(self, entity):
         if  self != entity:
-            dependence.append(entity)
+            self.dependence.append(entity)
+
+    @property
+    def value(self):
+        raise InternalError('Entity#value called')
     
+    @property
+    def size(self):
+        return self.type.size    
