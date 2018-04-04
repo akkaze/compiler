@@ -6,4 +6,5 @@ class DefinitionNode(StmtNode):
         super().__init__(loc)
         self.name = name
 
-    
+    def accept(self, visitor):
+        return visitor.visit(self) 

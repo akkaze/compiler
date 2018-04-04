@@ -2,16 +2,18 @@ from compiler.type import Type
 from compiler.ast import ExprNode
 from enum import Enum
 
-class UnaryOp(Enum):
-    PRE_INC = 1
-    PRE_FEC = 2
-    SUF_INC = 3
-    SUF_DEC = 4
-    MINUS = 5
-    ADD = 6
-    LOGIC_NOT = 7
-    BIT_NOT = 8
+
 class UnaryOpNode(ExprNode):
+    class UnaryOp(Enum):
+        PRE_INC = 1
+        PRE_DEC = 2
+        SUF_INC = 3
+        SUF_DEC = 4
+        MINUS = 5
+        ADD = 6
+        LOGIC_NOT = 7
+        BIT_NOT = 8
+
     operator = None
     expr = None
     type = None
@@ -30,3 +32,5 @@ class UnaryOpNode(ExprNode):
     @property
     def location(self):
         return self.expr.location
+    def accept(self, visitor):
+        return visitor.visit(self)

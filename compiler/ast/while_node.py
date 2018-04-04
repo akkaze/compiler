@@ -1,4 +1,4 @@
-from compiler.ast import {StmtNode, ExprNode}
+from compiler.ast import StmtNode, ExprNode
 
 class WhileNode(StmtNode):
     body = None
@@ -7,3 +7,5 @@ class WhileNode(StmtNode):
         super().__init__(loc)
         self.cond = cond
         self.body = BlockNode.warp_block(body)
+    def accept(self, visitor):
+        return visitor.visit(self)

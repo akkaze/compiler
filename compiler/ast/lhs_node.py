@@ -8,10 +8,6 @@ class LHSNode(ExprNode):
         super().__init__()
 
     @property
-    def type(self):
-        return self.type
-    
-    @property
     def alloc_size(self):
         return self.type.alloc_size()
 
@@ -23,4 +19,3 @@ class LHSNode(ExprNode):
     def is_assignable(self):
         return True
 
-    

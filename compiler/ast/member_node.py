@@ -12,8 +12,10 @@ class MemberNode(LHSNode):
 
     @property
     def is_assignable(self):
-        return !entity.type.is_function
+        return not entity.type.is_function
 
     @property
     def location(self):
         return expr.location
+    def accept(self, visitor):
+        return visitor.visit(self)

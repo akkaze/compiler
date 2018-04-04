@@ -1,6 +1,6 @@
-from compiler.ast import {StmtNode, ExprNode, BlockNode}
+from compiler.ast import StmtNode, ExprNode, BlockNode
 
-class WhileNode(StmtNode):
+class IfNode(StmtNode):
     cond = None
     then_body = None
     else_body = None
@@ -9,3 +9,5 @@ class WhileNode(StmtNode):
         self.cond = cond
         self.then_body = BlockNode.warp_block(then_body)
         self.else_body = BlockNode.warp_block(else_body)
+    def accept(self, visitor):
+        return visitor.visit(self)

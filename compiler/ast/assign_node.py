@@ -15,3 +15,5 @@ class AssignNode(ExprNode):
     @property
     def location(self):
         return self.lhs.location
+    def accept(self, visitor):
+        return visitor.visit(self)

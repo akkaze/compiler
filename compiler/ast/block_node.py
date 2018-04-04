@@ -18,3 +18,5 @@ class BlockNode(StmtNode):
             return node
         else:
             return BlockNode(node.location, [node])
+    def accept(self, visitor):
+        return visitor.visit(self)

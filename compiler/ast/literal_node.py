@@ -6,18 +6,10 @@ class LiteralNode(ExprNode):
     type = None
     
     def __init__(self, loc, type):
-        super().__init__()
         self.location = loc
         self.type = type
+        super().__init__()
 
     @property
     def is_constant(self):
         return True
-    
-    @property
-    def location(self):
-        return self.location
-
-    @property
-    def type(self):
-        return self.type
