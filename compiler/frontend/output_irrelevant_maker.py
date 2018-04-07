@@ -1,4 +1,22 @@
+import logging
 from compiler.frontend import ASTVisitor
+from compiler.options import options
+from compiler.ast import *
+from compiler.entity import *
+
+class DependenceEdge(object):
+    base = None
+    rely = None
+    def __init__(self, base,rely):
+        self.base = base
+        self.rely = rely
+    def __hash__(self):
+        return hash(self.base) + hash(self.rely)
+    def __eq__(self, other):
+        return isinstance(other, DependenceEdge) and \
+                    self.base == other.base and \
+                    self.rely == other.rely
+
 
 class OutputIrrelevantMaker(ASTVisitor):
     global_scope = None
@@ -13,27 +31,15 @@ class OutputIrrelevantMaker(ASTVisitor):
     main_function = None
 
     side_effect = 0
-    class DependeceEdge(object):
-        base = None
-        rely = None
-        def __init__(self, base,rely):
-            self.base = base
-            self.rely = rely
-        def __hash__(self):
-            return hash(base) + hash(rely)
-        def __eq(self, other):
-            return isinstance(other, DependenceEdge) and
-                    self.base == other.base and
-                    self.rely == other.rely
-
+    
     def __init__(self, ast):
-        global_scope = ast.scope
-        for entity in ast.scope.entities.values:
+        self.global_scope = ast.scope
+        for name, entity in ast.scope.entities.items():
             if isinstance(entity, VariableEntity):
                 self.global_variables.append(entity)
-            if isinstance(entity, FunctionEntity) and 
+            if isinstance(entity, FunctionEntity) and \
                 entity.name == 'main':
-                self.main-_function = entity
+                self.main_function = entity
         self.current_function = self.main_function
 
     visited = set()
@@ -52,10 +58,9 @@ class OutputIrrelevantMaker(ASTVisitor):
         for entity in all_entity:
             entity.is_output_irrelevant = True
 
-        self.global_scope.lookup('print').is_output_irrelevant = False
-        self.global_scope.lookup('println').is_output_irrelevant = False
+        #self.global_scope.lookup('print').is_output_irrelevant = False
+        #self.global_scope.lookup('println').is_output_irrelevant = False
         self.main_function.is_output_irrelevant = False
-
         before = 0
         after = -1
         while before != after:
@@ -69,8 +74,20 @@ class OutputIrrelevantMaker(ASTVisitor):
                 if not entity.is_output_irrelevant:
                     after += 1
         for definition_node in defs:
-            visit_definition(definition_node)
+            self.visit_definition(definition_node)
         self.visited.clear()
+
+        global options
+        if options.print_irrelevant_mark_info:
+            logging.error('******** EDGE ********')
+            for entity in all_entity:
+                logging.error(entity.name + ' :')
+                for rely in entity.dependence:
+                    logging.error('    ' + rely.name)
+                logging.error('')
+            logging.error('******** RES  ********')
+            for entity in all_entity:
+                logging.error(entity.name + ': ' + str(entity.is_output_irrelevant))
     def visit(self, node):
         if isinstance(node, ClassDefNode):
             self.visit_stmts(node.entity.member_funcs)
@@ -85,14 +102,15 @@ class OutputIrrelevantMaker(ASTVisitor):
             return
         elif isinstance(node, VariableDefNode):
             if node.entity.initializer:
-                self.visit(AssignNode(VariableNode(node.entity,
-                                        node.location. node.entity.initializer)))
+                self.visit(AssignNode(VariableNode(node.entity,\
+                                        node.location), \
+                                        node.entity.initializer))
             return
         elif isinstance(node, AssignNode):
             if not self.is_in_collect_mode:
                 lhs = node.lhs
                 if (isinstance(lhs.type, ArrayType) or 
-                    isinstance(lhs.type, ClassType)) and
+                    isinstance(lhs.type, ClassType)) and \
                     not isinstance(node.rhs, CreatorNode):
                     self.begin_collect()
                     self.visit_expr(node.lhs)
@@ -102,29 +120,29 @@ class OutputIrrelevantMaker(ASTVisitor):
                     if self.current_function:
                         self.current_function.is_output_irrelevant = False
                 else:
-                    backup_side_effect = self.side_effect:
+                    backup_side_effect = self.side_effect
                     base = self.get_base_entity(lhs)
                     self.assign_dependence_stack.append(base)
                     self.visit_expr(node.lhs)
                     self.visit_expr(node.rhs)
                     self.assign_dependence_stack.pop()
 
-                    if self.current_function and 
+                    if self.current_function and \
                         (base in self.gloal_variables):
                         base.add_dependence(self.current_function)
-                    if base.is_output_irrelevant and 
+                    if base.is_output_irrelevant and \
                         self.side_effect == backup_side_effect:
                         node.is_output_irrelevant = True
                     else:
                         node.is_output_irrelevant = False
                     self.side_effect = backup_side_effect
             return
-        elif isinstance(node, VariableNoe):
+        elif isinstance(node, VariableNode):
             if self.is_in_collect_mode:
                 self.collect_set.add(node.entity)
             else:
                 entity = node.entity
-                if self.current_function and
+                if self.current_function and \
                     (entity in self.global_variables):
                     self.current_fucntion.add_dependence(entity)
                 for base in self.assign_dependence_stack:
@@ -204,17 +222,17 @@ class OutputIrrelevantMaker(ASTVisitor):
                 self.control_dependence_stack.pop()
                 self.mark_node(node, control_vars)
             return
-        elif isinstance(node, PreffixOpNode):
+        elif isinstance(node, PrefixOpNode):
             if not self.is_in_collect_mode():
                 self.visit_expr(node.expr)
-                if node.operator == UnaryOp.PRE_DEC or 
+                if node.operator == UnaryOp.PRE_DEC or \
                     node.operator == UnaryOp.PRE_INC:
                     self.side_effect += 1
                 return
         elif isinstance(node, SuffixOpNode):
             if not self.is_in_collect_mode():
                 self.visit_expr(node.expr)
-                if node.operator == UnaryOp.SUF_DEC or 
+                if node.operator == UnaryOp.SUF_DEC or \
                     node.operator == UnaryOp.SUF_INC:
                     self.side_effect += 1
                 return

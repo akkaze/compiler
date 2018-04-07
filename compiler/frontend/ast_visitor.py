@@ -54,6 +54,21 @@ class ASTVisitor(object):
             self.visit_expr(node.lhs)
             self.visit_expr(node.rhs)
             return
+        elif isinstance(node, BinaryOpNode):
+            self.visit_expr(node.left)
+            self.visit_expr(node.right)
+            return
+        elif isinstance(node, LogicalOrNode):
+            self.visit_expr(node.left)
+            self.visit_expr(node.right)
+            return
+        elif isinstance(node, LogicalAndNode):
+            self.visit_expr(node.left)
+            self.visit_expr(node.right)
+            return
+        elif isinstance(node, UnaryOpNode):
+            self.visit_expr(node.expr)
+            return
         elif isinstance(node, FuncallNode):
             self.visit_expr(node.expr)
             self.visit_exprs(node.args)
