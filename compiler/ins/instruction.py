@@ -52,7 +52,7 @@ class Instruction(ABC):
     
     @property
     def all_ref(self):
-        if not self.m_all_reff:
+        if not self.m_all_ref:
             self.init_def_and_use()
             self.calc_def_and_use()
         return self.m_all_reff
