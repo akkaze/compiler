@@ -13,7 +13,7 @@ global options
 class IRBuilder(ASTVisitor):
     stmts = None
     ast = None
-    expr_depth = 2
+    expr_depth = 0
     max_depth = 0
     scope_stack = None
     current_scope = None
@@ -114,7 +114,7 @@ class IRBuilder(ASTVisitor):
             self.tmp_top = 0
             self.current_function = function_entity
             if function_entity.name != 'main':
-                function_entity.asm_name = entity_name + '__func__'
+                function_entity.asm_name = function_entity.name + '__func__'
             self.compile_function(function_entity)
 
         for class_entity in self.ast.class_entities:
@@ -691,7 +691,7 @@ class IRBuilder(ASTVisitor):
             return (False, 0)
     @property
     def need_return(self):
-        return self.expr_depth > 1
+        return (self.expr_depth > 1)
     def fetch_stmts(self):
         ret = self.stmts
         self.stmts = []
@@ -731,7 +731,7 @@ class IRBuilder(ASTVisitor):
                 else:
                     self.visit_expr(None)
                     self.expr_depth += 1
-                    self.stmts.append(CJump(self.visit(cond), 
+                    self.stmts.append(CJump(self.visit_expr(cond), 
                                         true_label, false_label))
                     self.expr_depth -= 1
             elif isinstance(cond, UnaryOpNode) and \

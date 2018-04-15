@@ -47,4 +47,10 @@ class Call(Instruction):
         args = ''
         for operand in self.operands:
             args += ', ' + str(operand)
-        return str(self.ret) + ' = call ' + self.entity.asm_name + args
+        ret_str = ''
+        if self.ret:
+            ret_str = str(self.ret)
+        else:
+            ret_str = 'none'
+        return ret_str + ' = call ' + \
+            self.entity.asm_name + args

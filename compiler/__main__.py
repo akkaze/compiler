@@ -1,5 +1,7 @@
 import sys
 import logging
+logging.basicConfig(level = logging.INFO,\
+    format = '%(message)s')
 from antlr4.InputStream import InputStream
 from antlr4.CommonTokenStream import CommonTokenStream
 from antlr4 import *
@@ -11,6 +13,7 @@ from compiler.backend import ControlFlowAnalyzer
 from compiler.backend import DataFlowAnalyzer
 from compiler.backend import RegisterConfig
 from compiler.backend import NaiveAllocator
+from compiler.backend import Allocator
 from compiler.backend import Translator
 from compiler.utils import *
 from compiler.options import *
@@ -41,7 +44,7 @@ def print_instructions(function_entities):
             continue
         for basic_block in function_entity.bbs:
             for ins in basic_block.ins:
-                logging.error(str(ins))
+                logging.info(str(ins))
 
 def compile(in_file, out_file):
     global options
@@ -77,7 +80,7 @@ def compile(in_file, out_file):
         print_instructions(emmiter.function_entities)
     register_config = RegisterConfig()
     
-    allocator = NaiveAllocator(emmiter, register_config)
+    allocator = Allocator(emmiter, register_config)
     allocator.allocate()
     
     translator = Translator(emmiter, register_config)
@@ -101,14 +104,14 @@ def parse_options(args):
             break
         elif args[i] == '-in':
             if (i + 1 >= len(args)):
-                logging.error('invalid argument for input file, \
+                logging.info('invalid argument for input file, \
                                 use default setting instead');
             else:
                 options.in_file = args[i + 1]
                 i = i + 1
         elif args[i] == '-out':
             if (i + 1 >= len(args)):
-                logging.error('invalid argument for output file, \
+                logging.info('invalid argument for output file, \
                                 use default setting instead')
             else:
                 options.out_file = args[i + 1]

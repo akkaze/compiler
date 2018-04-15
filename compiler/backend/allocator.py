@@ -416,7 +416,7 @@ class Allocator:
             v = y
         self.worklist_moves.remove(move)
         if u == v:
-            self.coalesce_moves.add(move)
+            self.coalesced_moves.add(move)
             self.add_worklist(u)
         elif (v in self.precolored) or \
             (self.get_edge(u, v) in self.edge_set):
@@ -772,8 +772,10 @@ class Allocator:
             edge2 not in self.edge_edge_map:
             self.edge_edge_map.remove(edge)
             self.edge_edge_map.remove(edge2)
-        u.adj_list.remove(v)
-        v.adj_list.remove(u)
+        if v in u.adj_list:
+            u.adj_list.remove(v)
+        if u in v.adj_list:
+            v.adj_list.remove(u)
         self.decrease_degree(u)
         self.decrease_degree(v)
 
