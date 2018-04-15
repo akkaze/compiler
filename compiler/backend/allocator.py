@@ -1,11 +1,14 @@
+from compiler.ins import *
 from compiler.ins.operand import *
+from compiler.utils import *
 from compiler.options import options
 import logging
 
 class Allocator:
     function_entities = None
     registers = None
-    param_registers = None
+    param_register_refs = None
+    caller_save_reg_refs = None
     reg_config = None
     rax = None
     rbx = None
@@ -44,34 +47,34 @@ class Allocator:
         self.rbp = self.registers[6]
         self.rsp = self.registers[7]
         
-        self.rrax = Reference(rax)
+        self.rrax = Reference(self.rax)
         self.rr10 = Reference(self.registers[10])
         self.rr11 = Reference(self.registers[11])
 
-        param_register_refs = []
+        self.param_register_refs = []
         for register in self.reg_config.param_registers:
-            param_register_refs.append(Reference(register))
+            self.param_register_refs.append(Reference(register))
 
-        self.rrdi = param_register_refs[0]
-        self.rrsi = param_register_refs[1]
-        self.rrdx = param_register_refs[2]
-        self.rrcx = param_register_refs[3]
+        self.rrdi = self.param_register_refs[0]
+        self.rrsi = self.param_register_refs[1]
+        self.rrdx = self.param_register_refs[2]
+        self.rrcx = self.param_register_refs[3]
 
-        precolored = []
-        precolored.extend(param_register_refs)
-        precolored.append(self.rrax)
-        precolored.append(self.rr10)
-        precolored.append(self.rr11)
+        self.precolored = set()
+        self.precolored |= set(self.param_register_refs)
+        self.precolored.add(self.rrax)
+        self.precolored.add(self.rr10)
+        self.precolored.add(self.rr11)
 
-        for ref in precolored:
+        for ref in self.precolored:
             ref.is_precolored = True
             ref.color = ref.reg
 
-        caller_save_ref_refs = set()
-        for ref in precolored:
-            if not ref.ref.is_callee_save:
-                caller_save_reg_refs.add(ref)
-
+        self.caller_save_reg_refs = set()
+        for ref in self.precolored:
+            if not ref.reg.is_callee_save:
+                self.caller_save_reg_refs.add(ref)
+        self.colors = []
         self.colors.extend(self.reg_config.param_registers)
         self.colors.append(self.rax)
         self.colors.append(self.reg_config.registers[1])
@@ -81,11 +84,12 @@ class Allocator:
         self.colors.append(self.reg_config.registers[13])
         self.colors.append(self.reg_config.registers[14])
         self.colors.append(self.reg_config.registers[15])
-        
+        self.K = len(self.colors) 
     def allocate(self):
         for function_entity in self.function_entities:
             if function_entity.is_inlined:
-                self.init(function_entity)
+                continue
+            self.init(function_entity)
             self.load_precolored(function_entity)
             self.allocate_function(function_entity)
 
@@ -102,7 +106,7 @@ class Allocator:
 
             if self.iter != 1:
                 function_entity.reg_used.append(self.rbp)
-            function_entity.local_variable_offset = loal_offset
+            function_entity.local_variable_offset = self.local_offset
 
     def init(self, entity):
         # global
@@ -126,7 +130,7 @@ class Allocator:
         self.frozen_moves = set()
         self.worklist_moves =  set()
         self.active_moves = set()
-        self.init_lliveness_analysis(entity)
+        self.init_liveness_analysis(entity)
         self.local_offset = 0
 
     edge_set = None
@@ -159,7 +163,7 @@ class Allocator:
         while True:
             self.liveness_analysis(entity)
             self.build(entity)
-            self.make_move_list()
+            self.make_work_list()
             while True:
                 if len(self.simplify_worklist) != 0:
                     self.simplify()
@@ -186,14 +190,14 @@ class Allocator:
 
     def dfs_sort(self, bb):
         self.sorted.append(bb)
-        self.visited.append(bb)
+        self.visited.add(bb)
         for pre in bb.predecessor:
             if pre not in self.visited:
                 self.dfs_sort(pre)
 
     def init_liveness_analysis(self, entity):
         self.sorted = []
-        self.visited = []
+        self.visited = set()
         for i in range(len(entity.bbs) - 1, -1, -1):
             pre = entity.bbs[i]
             if pre not in self.visited:
@@ -201,18 +205,17 @@ class Allocator:
 
     def liveness_analysis(self, entity):
         if options.print_global_allocation_info:
-            logging.error('====== USE & DEF ======')
+            logging.info('====== USE & DEF ======')
             for bb in entity.bbs:
                 for ins in bb.ins:
-                    logging.error('def:' + str(ins))
-                for ref in ins.ddef:
-                    logging.error(' ' + str(ref))
-                logging.error('      use: ')
-                for ref ins.use:
-                    logging.error(' ' + str(ref))
-                logging.error('')
-            logging.error('')
-        
+                    log_str = '{0: >20}'.format(str(ins)) 
+                    log_str += '     def: '
+                    for ref in ins.ddef:
+                        log_str += ' ' + str(ref)
+                    log_str += '     use:'
+                    for ref in ins.use:
+                        log_str += ' ' + str(ref)
+                    logging.info(log_str) 
         for bb in entity.bbs:
             ddef = bb.ddef
             use = bb.use
@@ -225,11 +228,12 @@ class Allocator:
                     if ref not in ddef:
                         use.add(ref)
                 for ref in ins.ddef:
-                    ddef.append(ref)
-            if self.iter == 0:
-                self.initial |= ins.all_ref
+                    ddef.add(ref)
+                if self.iter == 0:
+                    self.initial |= ins.all_ref
         modified = True
-        while not modified:
+        # among blocks
+        while modified:
             modified = False
             for bb in self.sorted:
                 new_in = set()
@@ -241,7 +245,6 @@ class Allocator:
                 new_out = set()
                 for suc in bb.successor:
                     new_out |= suc.live_in
-
                 if not (bb.live_in == new_in and \
                     bb.live_out == new_out):
                     modified = True
@@ -250,7 +253,7 @@ class Allocator:
     def build(self, entity):
         self.simplified_edge.clear()
         self.edge_set.clear()
-        self.initital -= self.precolored
+        self.initial -= self.precolored
         for ref in self.initial:
             ref.reset()
         for ref in self.precolored:
@@ -258,21 +261,21 @@ class Allocator:
         # build inference graph
         for bb in entity.bbs:
             live = set(bb.live_out)
-
+            
             for i in range(len(bb.ins) - 1, -1, -1):
                 ins = bb.ins[i]
-
                 for ref in live:
-                    ref.ref_time += 1
-
+                    ref.ref_times += 1
+                
                 tmp = set(live) 
+                ins.out = tmp
                 if isinstance(ins, Move) and ins.is_ref_move:
                     live -= ins.use
                     for ref in ins.ddef:
-                        ref.move_list.append(ins)
+                        ref.move_list.add(ins)
                     for ref in ins.use:
-                        ref.move_list.append(ins)
-                    self.worklist_move.append(ins)
+                        ref.move_list.add(ins)
+                    self.worklist_moves.add(ins)
                 live |= ins.ddef
                 for d in ins.ddef:
                     for l in live:
@@ -285,27 +288,45 @@ class Allocator:
                 ins.iin = tmp
 
         if options.print_global_allocation_info:
-            logging.error('====== IN & OUT ======')
+            logging.info('====== IN & OUT ======')
             for bb in entity.bbs:
                 for ins in bb.ins:
-                    loggging.error('in:' + str(ins))
+                    log_str = '{0: >20}'.format(str(ins))
+                    log_str += '      in:'
                     for ref in ins.iin:
-                        logging.error(' ' + str(ref))
-                    logging.error('out:')
+                        log_str += ' ' + str(ref)
+                    log_str += '     out:'
                     for ref in ins.out:
-                        logging.error(' ' + str(ref))
-                    logging.error('')
-                logging.error('')
+                        log_str += ' ' + str(ref)
+                    logging.info(log_str)
+                logging.info('')
+        
+        if options.print_global_allocation_info:
+            logging.info('===== EDGE =====')
+            for u in self.initial:
+                log_str = '{0: >10}'.format(u.name) + ':'
+                for v in u.adj_list:
+                    log_str += ' ' + v.name
+                logging.info(log_str)
     def make_work_list(self):
         for ref in self.initial:
             if ref.degree >= self.K:
-                self.spilled_worklist.append(ref)
+                self.spilled_worklist.add(ref)
             elif self.is_move_related(ref):
-                self.freeze_worklist.append(ref)
+                self.freeze_worklist.add(ref)
             else:
-                self.simplify_worklist.append(ref)
+                self.simplify_worklist.add(ref)
     def simplify(self):
-    
+        ref = list(self.simplify_worklist)[0]
+        self.move(ref, self.simplify_worklist, self.select_worklist)
+        self.select_stack.append(ref)
+
+        backup = ref.adj_list.copy()
+        for adj in backup:
+            self.simplified_edge.add(Allocator.Edge(adj, ref))
+            self.simplified_edge.add(Allocator.Edge(ref, adj))
+            self.delete_edge(ref, adj)
+        
     def decrease_degree(self, ref):
         d = ref.degree
         ref.degree -= 1
@@ -340,7 +361,7 @@ class Allocator:
                 return False
         return True
 
-    def conervative(self, u, v):
+    def conservative(self, u, v):
         k = 0
         adjs = set()
         adjs |= u.adj_list
@@ -353,16 +374,16 @@ class Allocator:
     def get_alias(self, ref):
         if ref in self.coalesced_nodes:
             ref.alias = self.get_alias(ref.alias)
-            return self.ref.alias
+            return ref.alias
         else:
             return ref
 
     def add_worklist(self, ref):
         if ref not in self.precolored and not \
-            ref.is_move_related(ref) and \
+            self.is_move_related(ref) and \
             ref.degree < self.K:
-            self.move(ref, freeze_worklist, \
-                simplify_worklist)
+            self.move(ref, self.freeze_worklist, \
+                self.simplify_worklist)
     def combine(self, u, v):
         if v in self.freeze_worklist:
             self.move(v, self.freeze_worklist, self.coalesced_nodes)
@@ -373,8 +394,10 @@ class Allocator:
         u.move_list |= v.move_list
         self.enable_moves(v)
 
-        backup = v.adj_list
+        backup = v.adj_list.copy()
+        print("=" + str(v))
         for t in backup:
+            print("==" + str(t))
             self.delete_edge(t, v)
             self.add_edge(u, t)
             if t.degree >= self.K and (t in self.freeze_worklist):
@@ -382,7 +405,7 @@ class Allocator:
         if u.degree >= self.K and (u in self.freeze_worklist):
             self.move(u, self.freeze_worklist, self.spill_worklist)
     def coalesce(self):
-        move = 
+        move =  list(self.worklist_moves)[0]
         x = self.get_alias(move.src)
         y = self.get_alias(move.dest)
         u = None
@@ -393,27 +416,26 @@ class Allocator:
         else:
             u = x
             v = y
-
         self.worklist_moves.remove(move)
         if u == v:
             self.coalesce_moves.add(move)
             self.add_worklist(u)
         elif (v in self.precolored) or \
             (self.get_edge(u, v) in self.edge_set):
-            self.constrained_moves.append(move)
+            self.constrained_moves.add(move)
             self.add_worklist(u)
             self.add_worklist(v)
-        elif ((u in self.precolored) and is_ok (u, v) or \
+        elif ((u in self.precolored) and self.is_ok (u, v) or \
             u not in self.precolored) and self.conservative(u, v):
-            self.coalsced_moves.append(move)
+            self.coalesced_moves.add(move)
             self.combine(u, v)
             self.add_worklist(u)
         else:
-            self.active_moves.append(move)
+            self.active_moves.add(move)
 
     def freeze(self):
-        u = 
-        self.move(um self.freeze_worklist, \
+        u = self.freeze_worklist[0]
+        self.move(self.freeze_worklist, \
             self.simplify_worklist)
         self.freeze_moves(u)
 
@@ -441,12 +463,16 @@ class Allocator:
 
     protect = None
     def select_spill(self):
-        to_spill = 
+        to_spill = self.spill_worklist[0] 
         self.protect.add('i')
         self.protect.add('j')
-
+        i = 1
         while (to_spill.name in self.protect) or \
-            ('spill' in to_spill.name) and
+            ('spill' in to_spill.name) and i < len(self.spill_worklist):
+            to_spill = self.spill_worklist[i]
+            i += 1
+        self.move(to_spill, self.spill_worklist, self.simplify_worklist)
+        self.freeze_moves(to_spill)
 
     def move(self, ref, ffrom, to):
         if ref in ffrom:
@@ -455,14 +481,15 @@ class Allocator:
                 to.add(ref)
             else:
                 raise InternalError('already exist move ' + ref.name +\
-                    + ' from ' + str(ffrom) + ' to ' + str(to))
+                    ' from ' + str(ffrom) + ' to ' + str(to))
         else:
             raise InternalError('empty move ' + ref.name + \
-                + ' from' + str(ffrom) + ' to ' + str(to))
+                ' from ' + str(ffrom) + ' to ' + str(to))
 
     def assign_colors(self, entity):
         for edge in self.simplified_edge:
-            self.add_edge(self.get_alias(edge.u), self.get_alias(edge.v))
+            self.add_edge(self.get_alias(edge.u), \
+                self.get_alias(edge.v))
         ok_colors = []
         while len(self.select_stack) != 0:
             n = self.select_stack[-1]
@@ -486,19 +513,22 @@ class Allocator:
                 node.color = self.get_alias(node).color
 
         if options.print_global_allocation_info:
-            logging.error('=== Assign Result === ({} {})'\
-                .format(name, iter))
-            logging.error('colored :')
+            logging.info('=== Assign Result === ({} {})'\
+                .format(entity.name, self.iter))
+            log_str = 'colored :'
             for ref in self.colored_nodes:
-                logging.error(' ' + ref.name + '(' + \
-                    ref.color.nam + ')')
-            logging.error('coalesced :')
+                log_str += ' ' + ref.name + '(' + \
+                    ref.color.nam + ')'
+            logging.info(log_str)
+            log_str = 'coalesced :'
             for ref in self.coalesced_nodes:
-                logging.error(' ' + ref.name + '(' + \
-                    self.get_alias(ref).name + ')')
-            logging.error('spilled :')
+                log_str += ' ' + ref.name + '(' + \
+                    self.get_alias(ref).name + ')'
+            logging.info(log_str)
+            log_str = 'spilled :'
             for ref in self.spilled_nodes:
-                logging.error(' ' + ref.name)
+                log_str += ' ' + ref.name
+            logging.info(log_str)
 
     spilled_counter = 0
     def rewrite_program(self, entity):
@@ -546,7 +576,7 @@ class Allocator:
                                         Reference.Type.UNKNOWN)
                                     new_temp.add(tmp)
                                     new_ins.add(Move(tmp, Address(\
-                                        self.rbp, None, 1, use.offset))
+                                        self.rbp, None, 1, use.offset)))
                                     ins.replace_use(use, tmp)
                     for ddef in ins_def:
                         if ddef.is_spilled:
@@ -568,69 +598,71 @@ class Allocator:
                                     stores.append(Move(Address(\
                                         self.rbp, None, 1, ddef.offset)),
                                         tmp)
-                    for ref in ins.all_ref:
-                        if ref in self.coalesced_nodes:
-                            ins.replace_all(ref, self.get_alias(ref))
-                    ins.init_def_and_use()
-                    ins.calc_def_and_use()
-                    if isinstance(ins, Move) and ins.is_ref_move and \
-                        ins.dest == ins.src:
-                        pass
-                    else:
-                        new_ins.add(ins)
-                    new_ins |= stores
-                bb.ins = new_ins
+                for ref in ins.all_ref:
+                    if ref in self.coalesced_nodes:
+                        ins.replace_all(ref, self.get_alias(ref))
+                ins.init_def_and_use()
+                ins.calc_def_and_use()
+                if isinstance(ins, Move) and ins.is_ref_move and \
+                    ins.dest == ins.src:
+                    pass
+                else:
+                    new_ins.append(ins)
+                new_ins.extend(stores)
+            bb.ins = new_ins
 
-                for param in entity.params:
-                    if param.reference in self.coalesced_nodes:
-                        param.reference = self.get_alias(param.reference)
-                    if param.reference in self.colored_nodes:
-                        param.reference.register = param.reference.color
-                if options.print_global_allocation_info:
-                    logging.error('===== REWRITE ======')
-                    for bb in entity.bbs:
-                        for ins in bb.ins:
-                            logging.error(str(ins))
-                self.select_stack.clear()
-                self.select_worklist.clear()
-                self.spilled_nodes.clear()
-                self.initial.clear()
-                self.initial |= self.colored_nodes
-                self.initial |= self.coalesced_nodes
-                self.initial |= new_temp
-                self.colored_nodes.clear()
-                self.coalesced_nodes.clear()
+        for param in entity.params:
+            if param.reference in self.coalesced_nodes:
+                param.reference = self.get_alias(param.reference)
+            if param.reference in self.colored_nodes:
+                param.reference.register = param.reference.color
+        if options.print_global_allocation_info:
+            logging.info('===== REWRITE ======')
+            for bb in entity.bbs:
+                for ins in bb.ins:
+                    logging.info(str(ins))
+        self.select_stack.clear()
+        self.select_worklist.clear()
+        self.spilled_nodes.clear()
+        self.initial.clear()
+        self.initial |= self.colored_nodes
+        self.initial |= self.coalesced_nodes
+        self.initial |= new_temp
+        self.colored_nodes.clear()
+        self.coalesced_nodes.clear()
     def load_precolored(self, entity):
-        for bb in entity.nns:
+        for bb in entity.bbs:
             new_ins = []
             for raw in bb.ins:
                 if isinstance(raw, Call):
                     param_reg_used = set()
+                    ins = raw
                     push_ct = 0
                     i = 0
                     for operand in ins.operands:
                         if i < len(self.param_register_refs):
-                            self.param_register_used.add(\
+                            param_reg_used.add(\
                                 self.param_register_refs[i])
                             new_ins.append(Move(\
-                                self.param_register.refs[i], operand))
+                                self.param_register_refs[i], operand))
                         else:
                             if isinstance(operand, Immediate):
                                 tmp = Reference('tmp_push', \
                                     Reference.Type.UNKNWON) 
                                 new_ins.append(Move(tmp, operand))
                                 operand = tmp
-                                push_ct += 1
+                            new_ins.append(Push(operand))
+                            push_ct += 1
                         i += 1
                     new_call = Call(ins.entity, [])
-                    new_call.caller_save = self.caller_save_reg_ref
-                    new_call.used_parametr_register = param_reg_used
+                    new_call.caller_save = self.caller_save_reg_refs
+                    new_call.used_parameter_register = param_reg_used
                     new_ins.append(new_call)
                     if push_ct > 0:
                         new_ins.append(Add(self.rbp, \
                             Immediate(self.push_ct * REG_SIZE)))
                     if ins.ret:
-                        new_ins.append(Move(ins.ref, self.rrax))
+                        new_ins.append(Move(ins.ret, self.rrax))
                 elif isinstance(raw, Div) or isinstance(raw, Mod):
                     new_ins.append(Move(self.rrax, raw.left))
                     new_ins.append(Move(self.rrdx, self.rdx))
@@ -652,17 +684,17 @@ class Allocator:
                 elif isinstance(raw, Return):
                     if raw.ret:
                         new_ins.append(Move(self.rrax, raw.ret))
-                    new_ins.append(Return(null))
+                    new_ins.append(Return(None))
                 elif isinstance(raw, Label):
                     if raw == entity.begin_label_ins:
                         i = 0
                         for param in entity.params:
-                            if i < len(self.param_registe_refs):
+                            if i < len(self.param_register_refs):
                                 new_ins.append(Move(param.reference, \
                                     self.param_register_refs[i]))
                             else:
                                 new_ins.append(Move(param.reference, \
-                                    param.source)
+                                    param.source))
                             i += 1
                     new_ins.append(raw)
                 elif isinstance(raw, Sal) or isinstance(raw, Sar):
@@ -681,9 +713,9 @@ class Allocator:
                 elif isinstance(raw, CJump) and raw.type != CJump.Type.BOOL:
                     left = raw.left
                     right = raw.right
-                    self.tans_compare(new_ins, raw, left, right)
+                    self.trans_compare(new_ins, raw, left, right)
                 else:
-                    self.new_ins.append(raw)
+                    new_ins.append(raw)
             bb.ins = new_ins
     def trans_compare(self, new_ins, raw, left, right):
         if left.is_address and right.is_address:
@@ -707,26 +739,26 @@ class Allocator:
             self.v = v
 
         def __str__(self):
-            return '(' + str(u) + ',' + str(v) + ')'
+            return '(' + str(self.u) + ',' + str(self.v) + ')'
 
         def __hash__(self):
-            return hash(u) + hash(v)
+            return hash(self.u) + hash(self.v)
 
         def __eq__(self, o):
-            return u == o.u and v == o.v
+            return self.u == o.u and self.v == o.v
 
     def add_edge(self, u, v):
         if u == v:
             return
         edge = self.get_edge(u, v)
-        if edge not in self.edge_et:
+        if edge not in self.edge_set:
             self.edge_set.add(edge)
             self.edge_set.add(self.get_edge(v, u))
-            if not u.precolored:
-                u.adj_list.append(v)
+            if not u.is_precolored:
+                u.adj_list.add(v)
                 u.degree += 1
-            if not v.precolored:
-                v.adj_list.append(u)
+            if not v.is_precolored:
+                v.adj_list.add(u)
                 v.degree += 1
 
     def delete_edge(self, u, v):
@@ -742,7 +774,6 @@ class Allocator:
             edge2 not in self.edge_edge_map:
             self.edge_edge_map.remove(edge)
             self.edge_edge_map.remove(edge2)
-
         u.adj_list.remove(v)
         v.adj_list.remove(u)
         self.decrease_degree(u)
@@ -750,8 +781,8 @@ class Allocator:
 
     edge_edge_map = None
     def get_edge(self, u, v):
-        tmp_edge = Edge(u, v)
-        find = edge_edge_map.get(tmp_edge)
+        tmp_edge = Allocator.Edge(u, v)
+        find = self.edge_edge_map.get(tmp_edge)
         if not find:
             self.edge_edge_map[tmp_edge] = tmp_edge
             return tmp_edge
@@ -760,7 +791,7 @@ class Allocator:
 
     def replace_reg_for_ins(self, ins, all_ref, reg_used):
         for ref in ins.all_ref:
-            self.all_ref.add(ref)
+            all_ref.add(ref)
             if ref.color:
                 ref.register = ref.color
                 reg_used.add(ref.color)
