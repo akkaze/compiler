@@ -7,7 +7,6 @@ global options
 
 class Translator:
     GLOBAL_PREFIX = '__global__'
-
     function_entities = None
     global_scope = None
     global_initializer = None
@@ -79,7 +78,7 @@ class Translator:
             if i < len(self.param_registers):
                 param.source.set_register(self.param_registers[i])
                 if ref.is_unknown:
-                    logging.error('unset parameter ' + ref.name)
+                    logging.info('unset parameter ' + ref.name)
             else:
                 param.source.set_offset(source_base, self.rbp)
                 source_base += param.type.size
@@ -97,7 +96,7 @@ class Translator:
                     
     def translate_function(self, entity):
         self.add_label(entity.asm_name)
-
+        start_pos = len(self.asm)
         for bb in entity.bbs:
             for ins in bb.ins:
                 ins.accept(self)
@@ -132,7 +131,9 @@ class Translator:
 
         prologue = self.asm
         self.asm = backup
-        self.asm.extend(prologue)
+        for i in range(len(prologue)):
+            self.asm.insert(start_pos + i, prologue[i])
+        del prologue
 
     def add(self, *args):
         if len(args) == 1:
@@ -319,11 +320,11 @@ class Translator:
                     if isinstance(ins.src, Address):
                         self.simplify_address(\
                             ins.src, self.rax, self.rdx)
-                    self.add('move', self.rdx, ins.src)
+                    self.add('mov', self.rdx, ins.src)
                     if isinstance(ins.dest, Address):
                         self.simplify_address(\
                             ins.src, self.rax, self.rcx)
-                    self.add('move', self.rcx, ins.dest)
+                    self.add('mov', ins.dest, self.rdx)
                 else:
                     if isinstance(ins.dest, Address):
                         self.simplify_address(\
@@ -382,9 +383,10 @@ class Translator:
                     t = left
                     left = right
                     right = t
+                    name = CJump.relect(name)
                 self.visit_compare(left, right)
-                if ins.fall_through == ins.true_label.name:
-                    name = CJump.get_not_name(name)
+                if ins.fall_through == ins.true_label:
+                    name = CJump.not_name(name)
                     self.add(name + ' ' + ins.false_label.name)
                 elif ins.fall_through == ins.false_label:
                     self.add(name + ' ' + ins.true_label.name)

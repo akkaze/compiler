@@ -7,6 +7,8 @@ from compiler.options import options
 import copy
 import logging
 
+global options
+
 class InstructionEmmiter(object):
     function_entities = None
     global_scope = None
@@ -52,7 +54,6 @@ class InstructionEmmiter(object):
             function_entity.tmp_stack = self.tmp_stack
 
     def emit_function(self, entity):
-        global options
         if entity.is_inlined:
             return
         call_size = len(entity.calls)
@@ -62,7 +63,7 @@ class InstructionEmmiter(object):
         if options.enable_leaf_function_optimization \
             and call_size == 0:
             self.is_in_leaf = True
-            logging.error(entity.name + ' is leaf')
+            logging.info(entity.name + ' is leaf')
             self.used_global = set()
             for name, glob in self.global_scope.entities.items():
                 if isinstance(glob, VariableEntity):
@@ -110,7 +111,7 @@ class InstructionEmmiter(object):
             self.mul = mul
             self.add = add
 
-    mathch_simple_add = False
+    match_simple_add = False
     def match_base_index_mul(self, expr):
         if not isinstance(expr, compiler.ir.Binary):
             return
@@ -119,7 +120,7 @@ class InstructionEmmiter(object):
         index = None
         matched = False
         if bin.operator == compiler.ir.Binary.BinaryOp.ADD:
-            if isinstance(bin.right, Binary) and \
+            if isinstance(bin.right, compiler.ir.Binary) and \
                 bin.right.operator == compiler.ir.Binary.BinaryOp.MUL:
                 base = bin.left
                 right = bin.right
@@ -131,7 +132,7 @@ class InstructionEmmiter(object):
                     index = right.right
                     mul = right.left.value
                     matched = True
-            elif isinstance(bin.left, Binary) and \
+            elif isinstance(bin.left, compiler.ir.Binary) and \
                 bin.left.operator == compiler.ir.Binary.BinaryOp.MUL:
                 base = bin.right
                 left = bin.left
@@ -154,7 +155,6 @@ class InstructionEmmiter(object):
             return
     
     def match_address(self, expr):
-        global options
         if not options.enable_instruction_selection:
             return
         if not isinstance(expr, compiler.ir.Binary):
@@ -440,7 +440,8 @@ class InstructionEmmiter(object):
                 self.used_global.add(entity)
                 return ret
         return entity
-
+    
+    # elinimate extra use of address
     def eliminate_address(self, operand):
         if isinstance(operand, Address) or (\
             isinstance(operand, Reference) and \
@@ -467,7 +468,6 @@ class InstructionEmmiter(object):
         return -1
 
     def get_tmp(self):
-        global options
         if options.enable_global_register_allocation:
             ref = Reference('ref_' + str(self.tmp_counter), \
                 Reference.Type.UNKNOWN)

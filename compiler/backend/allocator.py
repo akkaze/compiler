@@ -171,7 +171,7 @@ class Allocator:
                     self.coalesce()
                 elif len(self.freeze_worklist) != 0:
                     self.freeze()
-                elif len(self.spilled_worklist) != 0:
+                elif len(self.spill_worklist) != 0:
                     self.select_spill()
                 if len(self.simplify_worklist) == 0 and \
                     len(self.worklist_moves) == 0 and \
@@ -311,7 +311,7 @@ class Allocator:
     def make_work_list(self):
         for ref in self.initial:
             if ref.degree >= self.K:
-                self.spilled_worklist.add(ref)
+                self.spill_worklist.add(ref)
             elif self.is_move_related(ref):
                 self.freeze_worklist.add(ref)
             else:
@@ -334,7 +334,7 @@ class Allocator:
             self.enable_moves(ref)
             for adj in ref.adj_list:
                 self.enable_moves(ref)
-            if ref in self.spilled_worklist:
+            if ref in self.spill_worklist:
                 if self.is_move_related(ref):
                     self.move(ref, self.spill_worklist, \
                         self.freeze_worklist)
@@ -352,7 +352,7 @@ class Allocator:
         for move in ref.move_list:
             if move in self.active_moves:
                 self.active_moves.remove(move)
-                self.worklist_moves.append(move)
+                self.worklist_moves.add(move)
 
     def is_ok(self, u, v):
         for t in v.adj_list:
@@ -395,9 +395,7 @@ class Allocator:
         self.enable_moves(v)
 
         backup = v.adj_list.copy()
-        print("=" + str(v))
         for t in backup:
-            print("==" + str(t))
             self.delete_edge(t, v)
             self.add_edge(u, t)
             if t.degree >= self.K and (t in self.freeze_worklist):
@@ -494,15 +492,15 @@ class Allocator:
         while len(self.select_stack) != 0:
             n = self.select_stack[-1]
             self.select_stack.pop()
-            self.ok_colors.clear()
+            ok_colors.clear()
             for color in self.colors:
                 ok_colors.append(color)
 
             for w in n.adj_list:
                 w = self.get_alias(w)
                 if (w in self.colored_nodes) or (w in self.precolored):
-                    self.ok_colors.remove(w.color)
-            if len(ok_colrs) == 0:
+                    ok_colors.remove(w.color)
+            if len(ok_colors) == 0:
                 self.move(n, self.select_worklist, spilled_nodes)
                 n.color = None
             else:
@@ -518,7 +516,7 @@ class Allocator:
             log_str = 'colored :'
             for ref in self.colored_nodes:
                 log_str += ' ' + ref.name + '(' + \
-                    ref.color.nam + ')'
+                    ref.color.name + ')'
             logging.info(log_str)
             log_str = 'coalesced :'
             for ref in self.coalesced_nodes:
@@ -793,5 +791,5 @@ class Allocator:
         for ref in ins.all_ref:
             all_ref.add(ref)
             if ref.color:
-                ref.register = ref.color
+                ref.set_register(ref.color)
                 reg_used.add(ref.color)

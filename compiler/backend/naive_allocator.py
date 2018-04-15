@@ -82,7 +82,6 @@ class NaiveAllocator:
         stack_base += entity.scope.locate_local_variable(\
                         lvar_base, options.STACK_VAR_ALIGNMENT_SIZE)
         for var in entity.scope.all_local_variables():
-            print(var.reference)
             var.reference.set_offset(-var.offset, self.rbp)
 
         tmp_stack = entity.tmp_stack
@@ -90,6 +89,6 @@ class NaiveAllocator:
         for i in range(len(tmp_stack)):
             tmp = tmp_stack[i]
             if tmp.is_unknown:
-                saved_tmp_base += REG_SIZE
+                saved_tmp_base += options.REG_SIZE
                 tmp.set_offset(-saved_tmp_base, self.rbp)
         entity.local_variable_offset = saved_tmp_base

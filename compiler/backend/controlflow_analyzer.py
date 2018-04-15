@@ -3,7 +3,6 @@ from compiler.backend import BasicBlock
 from collections import deque
 from compiler.options import *
 import logging
-import copy
 global options
 class ControlFlowAnalyzer:
     function_entities = None
@@ -19,8 +18,8 @@ class ControlFlowAnalyzer:
             if options.enable_controlflow_optimization:
                 self.optimize(function_entity)
             self.layout_basic_block(function_entity)
-            if options.print_basic_blocks:
-                self.print_self()
+        if options.print_basic_blocks:
+            self.print_self()
 
     ct = 0
     def build_basic_block(self, entity):
@@ -106,7 +105,7 @@ class ControlFlowAnalyzer:
                     continue
                 last = to_remove.ins[1]
                 if len(to_remove.ins) == 2 and isinstance(last, Jmp):
-                    backup = copy.deepycopy(to_remove.predecessor)
+                    backup = to_remove.predecessor.copy()
                     for pre in backup:
                         jump = pre.ins[len(pre.ins) - 1]
                         if isinstance(jump, Jmp):
@@ -141,7 +140,7 @@ class ControlFlowAnalyzer:
                 for bb in entity.bbs:
                     if len(bb.successor) == 2 and \
                         bb.successor[0] == bb.successor[1]:
-                        logging.error('find redundant Cjump')
+                        logging.info('find redundant Cjump')
 
                 for bb in useless_basic_block:
                     if bb in entity.bbs:
@@ -171,16 +170,16 @@ class ControlFlowAnalyzer:
         entity.bbs = new_bbs
         entity.ins = None
 
-    def print_self(slef):
+    def print_self(self):
         for function_entity in self.function_entities:
-            logging.error('====== ' + function_entity.name + ' ======')
+            logging.info('====== ' + function_entity.name + ' ======')
             if function_entity.is_inlined:
-                logging.erro('BE INLINED')
+                logging.info('BE INLINED')
                 continue
             for bb in function_entity.bbs:
-                logging.error('---- b ---- jump to:')
+                log_str = '---- b ---- jump to:'
                 for label in bb.jump_to:
-                    logging.error(' ' + label.name)
-                logging.error()
+                    log_str += ' ' + label.name
+                logging.info(log_str)
                 for ins in bb.ins:
-                    logging.error(str(ins))
+                    logging.info(str(ins))

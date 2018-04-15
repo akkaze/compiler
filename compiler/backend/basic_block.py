@@ -21,7 +21,7 @@ class BasicBlock(object):
         self.ins = []
         self.jump_to = []
 
-        self.use = dict()
-        self.ddef = dict()
-        self.live_in = dict()
-        self.live_out = dict()
+        self.use = set()
+        self.ddef = set()
+        self.live_in = set()
+        self.live_out = set()

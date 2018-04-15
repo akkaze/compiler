@@ -170,7 +170,7 @@ class IRBuilder(ASTVisitor):
                 if options.enable_output_irrelevant_elimination and \
                     node.entity.is_output_irrelevant:
                     if options.print_remove_info:
-                        logging.error('remove init ' + str(node.location))
+                        logging.info('remove init ' + str(node.location))
                 else:
                     assign = ExprStmtNode(node.location, AssignNode( \
                                 VariableNode(node.entity, node.location), init))
@@ -200,7 +200,7 @@ class IRBuilder(ASTVisitor):
             else_label = Label()
             end_label = Label()
             if not node.else_body:
-                self.add_cjump(node.end, then_label, end_label)
+                self.add_cjump(node.cond, then_label, end_label)
                 self.add_label(then_label, 'if_then')
                 if node.then_body:
                     self.visit_stmt(node.then_body)
@@ -220,7 +220,7 @@ class IRBuilder(ASTVisitor):
             if options.enable_output_irrelevant_elimination and \
                 node.is_output_irrelevant:
                 if options.print_remove_info:
-                    logging.error('! remove while ' + str(node.location))
+                    logging.info('! remove while ' + str(node.location))
                     return
                 self.visit_loop(None, node.cond, None, node.body)
                 return
@@ -228,7 +228,7 @@ class IRBuilder(ASTVisitor):
             if options.enable_output_irrelevant_elimination and \
                 node.is_output_irrelevant:
                 if options.print_remove_info:
-                    logging.error('! remove for ' + str(node.location))
+                    logging.info('! remove for ' + str(node.location))
                     return
                 self.visit_loop(node.init, node.cond, node.incr, node.body)
                 return
@@ -269,7 +269,7 @@ class IRBuilder(ASTVisitor):
                 options.enable_output_irrelevant_elimination and \
                 node.is_output_irrelevant:
                 if options.print_remove_info:
-                    logging.error('! remove assign ' + str(node.location))
+                    logging.info('! remove assign ' + str(node.location))
                 return
             if options.enable_common_assign_elimination and \
                 isinstance(lhs, Var):
@@ -439,7 +439,7 @@ class IRBuilder(ASTVisitor):
                 entity.can_be_self_inline(self.inline_mode)): 
                 if options.print_inline_info and \
                     entity == self.current_function:
-                    logging.error(entity.name + ' is self expanded')
+                    logging.info(entity.name + ' is self expanded')
                 if self.need_return:
                     tmp = self.new_int_tmp()
                     self.inline_function(entity, tmp, args)
@@ -720,11 +720,11 @@ class IRBuilder(ASTVisitor):
                 node = cond
                 goon = Label()
                 op = cond.operator
-                if op == LOGIC_AND:
+                if op == BinaryOpNode.BinaryOp.LOGIC_AND:
                     self.add_cjump(node.left, goon, flase_label)
                     self.add_label(goon, 'goon')
                     self.add_cjump(node.right, goon, flase_label)
-                elif op == LOGIC_OR:
+                elif op == BinaryOpNode.BinaryOp.LOGIC_OR:
                     self.add_cjump(node.left, true_label, goon)
                     self.add_label(goon, 'goon')
                     self.add_cjump(node.right, true_label, false_label)

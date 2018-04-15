@@ -268,7 +268,7 @@ class ASTBuilder(MalicListener):
         value = value[1:len(value) - 1]
         self.map[ctx] = StringLiteralNode(Location(ctx), value)
     def exitBoolConst(self, ctx):
-        self.map[ctx] = BoolLiteralNode(Locaation(ctx), 
+        self.map[ctx] = BoolLiteralNode(Location(ctx), 
             ctx.value.text == 'true')
     def exitNullConst(self, ctx):
         self.map[ctx] = VariableNode(Location(ctx), 'null')

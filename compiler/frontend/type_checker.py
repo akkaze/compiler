@@ -104,7 +104,7 @@ class TypeChecker(ASTVisitor):
                         node.expr.type, \
                         self.current_function.return_type, True)
                 else:
-                    if not self.current_function.is_void:
+                    if not self.current_function.return_type.is_void:
                         raise SemanticError(node.location, \
                             'cannot return to void')
             return

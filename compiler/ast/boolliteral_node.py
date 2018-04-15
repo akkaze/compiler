@@ -4,7 +4,7 @@ from compiler.ast import LiteralNode
 class BoolLiteralNode(LiteralNode):
     value = False
 
-    def __init__(loc, value):
+    def __init__(self, loc, value):
         super().__init__(loc, BoolType())
         self.value = value
     def accept(self, visitor):

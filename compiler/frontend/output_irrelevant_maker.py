@@ -79,15 +79,15 @@ class OutputIrrelevantMaker(ASTVisitor):
 
         global options
         if options.print_irrelevant_mark_info:
-            logging.error('******** EDGE ********')
+            logging.info('******** EDGE ********')
             for entity in all_entity:
-                logging.error(entity.name + ' :')
+                logging.info(entity.name + ' :')
                 for rely in entity.dependence:
-                    logging.error('    ' + rely.name)
-                logging.error('')
-            logging.error('******** RES  ********')
+                    logging.info('    ' + rely.name)
+                logging.info('')
+            logging.info('******** RES  ********')
             for entity in all_entity:
-                logging.error(entity.name + ': ' + str(entity.is_output_irrelevant))
+                logging.info(entity.name + ': ' + str(entity.is_output_irrelevant))
     def visit(self, node):
         if isinstance(node, ClassDefNode):
             self.visit_stmts(node.entity.member_funcs)
