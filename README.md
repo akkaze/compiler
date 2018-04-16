@@ -37,7 +37,7 @@ int main() {
 >* Then, run **python3 -m compiler -in test.c -out out.asm** 
 >* At last, run **cat out.asm**, you may see the follwing assembly codes
 ```c++
-  section .data
+  	section .data
 	
 	section .text
 	ALIGN 16
