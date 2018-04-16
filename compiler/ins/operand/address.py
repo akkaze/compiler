@@ -5,7 +5,7 @@ class Address(Operand):
     index = None
     mul = 1
     add = 0
-    show_size = False
+    show_size = True
     m_base_nasm = None
     m_index_nasm = None
     def __init__(self, *args):

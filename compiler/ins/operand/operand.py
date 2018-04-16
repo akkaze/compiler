@@ -3,7 +3,7 @@ class Operand(object):
 
     def get_all_ref(self):
         pass
-    def replace(self, from, to):
+    def replace(self, ffrom, to):
         pass
     @property
     def is_register(self):

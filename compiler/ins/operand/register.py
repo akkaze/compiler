@@ -1,3 +1,5 @@
+from compiler.ins.operand import Operand
+
 class Register(Operand):
     name = ''
     low_name = ''
@@ -9,10 +11,19 @@ class Register(Operand):
     @property
     def is_caller_save(self):
         return not self.is_callee_save
-    def replace(self, from, to):
+    
+    @property
+    def is_register(self):
+        return True
+    @property
+    def is_direct(self):
+        return True
+    def replace(self, ffrom, to):
         return self
     def get_all_ref(self):
         return set()
     @property
     def nasm(self):
+        return self.name
+    def __str__(self):
         return self.name
