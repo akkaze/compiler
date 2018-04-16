@@ -314,22 +314,23 @@ class InstructionEmmiter(object):
                     self.ins.append(CJump(left, right, type, \
                         self.get_label(ir.true_label.name), \
                         self.get_label(ir.false_label.name)))
-                else:
-                    cond = self.visit_expr(ir.cond)
-                    if isinstance(cond, Immediate):
-                        if cond.value != 0:
-                            self.ins.append(Jump(self.get_label(\
-                                ir.true_label.name)))
-                        else:
-                            self.ins.append(Jump(self.get_label(\
-                                ir.false_label.name)))
+            else:
+                cond = self.visit_expr(ir.cond)
+                if isinstance(cond, Immediate):
+                    if cond.value != 0:
+                        self.ins.append(Jump(self.get_label(\
+                            ir.true_label.name)))
                     else:
-                        if cond.is_address:
-                            tmp = self.get_tmp()
-                            self.ins.append(Move(tmp, cond))
-                            cond = tmp
-                        self.ins.append(CJump(cond, self.get_label(\
+                        self.ins.append(Jump(self.get_label(\
                             ir.false_label.name)))
+                else:
+                    if cond.is_address:
+                        tmp = self.get_tmp()
+                        self.ins.append(Move(tmp, cond))
+                        cond = tmp
+                    self.ins.append(CJump(cond, self.get_label(\
+                        ir.true_label.name), self.get_label( \
+                        ir.false_label.name)))
             return
         elif isinstance(ir, compiler.ir.Jump):
             self.ins.append(Jmp(self.get_label(ir.label.name)))
@@ -399,10 +400,10 @@ class InstructionEmmiter(object):
         elif operator == compiler.ir.Binary.BinaryOp.MOD:
             self.ins.append(Mod(left, right))
         elif operator == compiler.ir.Binary.BinaryOp.LOGIC_AND \
-            and operator == compiler.ir.Binary.BinaryOp.BIT_AND:
+            or operator == compiler.ir.Binary.BinaryOp.BIT_AND:
             self.ins.append(And(left, right))
         elif operator == compiler.ir.Binary.BinaryOp.LOGIC_OR \
-            and operator == compiler.ir.Binary.BinaryOpOp.BIT_OR:
+            or operator == compiler.ir.Binary.BinaryOp.BIT_OR:
             self.ins.append(Or(left, right))
         elif operator == compiler.ir.Binary.BinaryOp.BIT_XOR:
             self.ins.append(Xor(left, right))

@@ -80,7 +80,7 @@ class ASTBuilder(MalicListener):
     def exitParameter(self, ctx):
         self.map[ctx] = ParameterEntity(Location(ctx), \
                                     self.map.get(ctx.typeType()),\
-                                    ctx.Indentifier().text)
+                                    ctx.Identifier().getText())
     def exitPrimitiveType(self, ctx):
         stype = ctx.ttype.text
         if stype == 'bool':
@@ -127,7 +127,7 @@ class ASTBuilder(MalicListener):
                             self.get_expr(ctx.init), \
                             self.get_expr(ctx.cond), \
                             self.get_expr(ctx.incr), \
-                            self.ctx.statement())
+                            self.get_stmt(ctx.statement()))
     def exitWhileStmt(self, ctx):
         self.map[ctx] = WhileNode(Location(ctx), \
                             self.get_expr(ctx.expression()),\
@@ -202,7 +202,7 @@ class ASTBuilder(MalicListener):
             op = UnaryOpNode.UnaryOp.LOGIC_NOT
         else:
             raise InternalError('Invalid token ' + text)
-        self.map[ctx] = PrefixNode(op, \
+        self.map[ctx] = PrefixOpNode(op, \
                     self.get_expr(ctx.expression()))
 
     def exitBinaryExpr(self, ctx):
@@ -235,7 +235,7 @@ class ASTBuilder(MalicListener):
         elif text == '!=':
             op = BinaryOpNode.BinaryOp.NE
         elif text == '&':
-            op = BinaryOpNode.BinaryOp.BIT_ADD
+            op = BinaryOpNode.BinaryOp.BIT_AND
         elif text == '^':
             op = BinaryOpNode.BinaryOp.BIT_XOR
         elif text == '|':

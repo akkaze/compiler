@@ -11,7 +11,7 @@ class ASTVisitor(object):
         return expr.accept(self)
     def visit_exprs(self, exprs):
         for expr in exprs:
-            self.visit_expr(exprs)
+            self.visit_expr(expr)
     def visit_definition(self, ddef):
         ddef.accept(self)
     def visit_definitions(self, ddefs):
@@ -30,6 +30,21 @@ class ASTVisitor(object):
                 self.visit_expr(node.then_body)
             if node.else_body:
                 self.visit_expr(node.else_body)
+            return
+        elif isinstance(node, WhileNode):
+            self.visit_expr(node.cond)
+            if node.body:
+                self.visit_stmt(node.body)
+            return
+        elif isinstance(node, ForNode):
+            if node.init:
+                self.visit_expr(node.init)
+            if node.cond:
+                self.visit_expr(node.cond)
+            if node.incr:
+                self.visit_expr(node.incr)
+            if node.body:
+                self.visit_stmt(node.body)
             return
         elif isinstance(node, BreakNode):
             return

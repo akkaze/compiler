@@ -222,16 +222,16 @@ class IRBuilder(ASTVisitor):
                 if options.print_remove_info:
                     logging.info('! remove while ' + str(node.location))
                     return
-                self.visit_loop(None, node.cond, None, node.body)
-                return
+            self.visit_loop(None, node.cond, None, node.body)
+            return
         elif isinstance(node, ForNode):
             if options.enable_output_irrelevant_elimination and \
                 node.is_output_irrelevant:
                 if options.print_remove_info:
                     logging.info('! remove for ' + str(node.location))
                     return
-                self.visit_loop(node.init, node.cond, node.incr, node.body)
-                return
+            self.visit_loop(node.init, node.cond, node.incr, node.body)
+            return
         elif isinstance(node, ContinueNode):
             self.clear_assign_table()
             self.stmts.append(Jump(self.test_label_stack[-1]))
@@ -667,6 +667,7 @@ class IRBuilder(ASTVisitor):
             self.visit_expr(incr)
         self.end_label_stack.pop()
         self.test_label_stack.pop()
+        self.add_label(test_label, 'loop_test')
         if cond:
             self.add_cjump(cond, begin_label, end_label)
         else:
@@ -721,9 +722,9 @@ class IRBuilder(ASTVisitor):
                 goon = Label()
                 op = cond.operator
                 if op == BinaryOpNode.BinaryOp.LOGIC_AND:
-                    self.add_cjump(node.left, goon, flase_label)
+                    self.add_cjump(node.left, goon, false_label)
                     self.add_label(goon, 'goon')
-                    self.add_cjump(node.right, goon, flase_label)
+                    self.add_cjump(node.right, true_label, false_label)
                 elif op == BinaryOpNode.BinaryOp.LOGIC_OR:
                     self.add_cjump(node.left, true_label, goon)
                     self.add_label(goon, 'goon')

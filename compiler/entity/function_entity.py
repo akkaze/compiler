@@ -38,7 +38,6 @@ class FunctionEntity(Entity):
         self.body = body
         self.return_type = return_type
         self.type.entity = self
-        self.params = []
         self.calls = []
         self.irs = []
         self.bbs = []

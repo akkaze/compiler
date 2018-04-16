@@ -58,7 +58,6 @@ class SymbolResolver(ASTVisitor):
             if self.current_class:
                 self.current_this = entity.add_thispointer(node.location, \
                                                             self.current_class)
-
             for param in entity.params:
                 self.current_scope.insert(param)
                 if not self.resolve_type(param.type):
@@ -83,7 +82,7 @@ class SymbolResolver(ASTVisitor):
             entity = node.entity
             if not self.resolve_type(entity.type): 
                 raise SemanticError(node.location, 'Cannot resolve symbol : ' \
-                                + str(entity.type))
+                                + str(node.type))
             if not self.current_class or \
                 self.current_class.scope != self.current_scope:
                 if entity.initializer:
@@ -122,7 +121,7 @@ class SymbolResolver(ASTVisitor):
             if not entity: 
                 raise SemanticError(node.location, \
                                 'Cannot resolve symbol : ' \
-                                + entity.name)
+                                + node.name)
             node.entity = entity
             if self.current_class and \
                 self.current_class.scope.lookup_current_level(node.name):

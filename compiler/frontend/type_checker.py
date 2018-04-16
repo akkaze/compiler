@@ -76,7 +76,7 @@ class TypeChecker(ASTVisitor):
                     node.cond.type, self.bool_type, True)
             if node.init:
                 self.visit_expr(node.incr)
-            if node.then_body:
+            if node.body:
                 self.loop_depth += 1
                 self.visit_stmt(node.body)
                 self.loop_depth -= 1
