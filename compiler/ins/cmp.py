@@ -1,4 +1,5 @@
 from compiler.ins import Instruction
+from compiler.ins.operand import Reference
 from enum import Enum
 class Cmp(Instruction):
     class Operator(Enum):

@@ -1,4 +1,5 @@
 from compiler.ins import Instruction
+from compiler.ins.operand import Immediate
 from enum import Enum
 
 class CJump(Instruction):
@@ -24,7 +25,7 @@ class CJump(Instruction):
         if len(args) == 3:
             self.type = CJump.Type.BOOL
             self.cond = args[0]
-            if isinstance(cond, Immediate):
+            if isinstance(self.cond, Immediate):
                 raise InternalError('')
             self.true_label = args[1]
             self.false_label = args[2]
@@ -112,7 +113,7 @@ class CJump(Instruction):
  
     def __str__(self):
         if self.type == CJump.Type.BOOL:
-            return 'Cjump ' + str(self.cond) + ', ' + \
+            return 'cjump ' + str(self.cond) + ', ' + \
                     str(self.true_label) + ', ' + str(self.false_label)
         else:
             return self.name + ' ' + str(self.left) + ' ' + \

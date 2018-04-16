@@ -12,14 +12,15 @@ class Binary(Expr):
         RSHIFT = 7
         LT = 8
         GT = 9
-        GE = 10
-        EQ = 11
-        NE = 12
-        BIT_AND = 13
-        BIT_XOR = 14
-        BIT_OR = 15
-        LOGIC_AND = 16
-        LOGIC_OR = 16
+        LE = 10
+        GE = 11
+        EQ = 12
+        NE = 13
+        BIT_AND = 14
+        BIT_XOR = 15
+        BIT_OR = 16
+        LOGIC_AND = 17
+        LOGIC_OR = 18
 
 
     left = None
