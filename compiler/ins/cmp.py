@@ -1,6 +1,8 @@
 from compiler.ins import Instruction
 from compiler.ins.operand import Reference
 from enum import Enum
+
+
 class Cmp(Instruction):
     class Operator(Enum):
         EQ = 1
@@ -20,11 +22,13 @@ class Cmp(Instruction):
         super().__init__()
 
     def replace_use(self, ffrom, to):
-        right = right.replace(ffrom, to)
+        self.right = self.right.replace(ffrom, to)
         if self.left != ffrom:
             self.left = self.left.replace(ffrom, to)
+
     def replace_def(self, ffrom, to):
         self.left = self.left.replace(ffrom, to)
+
     def replace_all(self, ffrom, to):
         self.left = self.left.replace(ffrom, to)
         self.right = self.right.replace(ffrom, to)
@@ -39,6 +43,6 @@ class Cmp(Instruction):
 
     def accept(self, translator):
         return translator.visit(self)
- 
+
     def __str__(self):
         return 'cmp ' + str(self.left) + ', ' + str(self.right)

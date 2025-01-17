@@ -1,3 +1,4 @@
+from inspect import trace
 from compiler.ins import Bin
 
 class Add(Bin):
@@ -6,4 +7,3 @@ class Add(Bin):
         self.name = 'add'
     def accept(self, translator):
         return translator.visit(self)
- 

@@ -2,12 +2,8 @@ from compiler.ast import LHSNode
 from compiler.ast import Location
 
 class VariableNode(LHSNode):
-    location = None
-    name = ''
-    entity = None
-    this_pointer = None
-
     def __init__(self, *args):
+        super().__init__()
         if len(args) == 1:
             self.entity = args[0]
         elif len(args) == 2:
@@ -18,7 +14,8 @@ class VariableNode(LHSNode):
                 self.entity = args[0]
                 self.location = args[1]
                 self.name = args[0].name
-
+        self.this_pointer = None
+        
     @property
     def type(self):
         return self.entity.type
@@ -28,3 +25,6 @@ class VariableNode(LHSNode):
         return self.this_pointer != None
     def accept(self, visitor):
         return visitor.visit(self)
+
+    def __str__(self):
+        return self.name

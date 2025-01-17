@@ -1,23 +1,28 @@
 from compiler.ast import LHSNode
 
+
 class ArefNode(LHSNode):
-    expr = None
-    index = None
-    
-    def __init__(self, expr, index, type = None):
+
+    def __init__(self, expr, index, type=None):
         self.expr = expr
-        self.index = inde
-        if type:
-            self.type = type
-    
+        self.index = index
+        self.type = type
+        super().__init__()
+
     @property
     def is_multi_dimension(self):
         return isinstance(self.expr, ArefNode)
+
     @property
     def base_expr(self):
-        if self.is_multi_dimension():
-            return expr.base_expr
+        if self.is_multi_dimension:
+            return self.expr.base_expr
         else:
-            return expr
+            return self.expr
+
+    @property
+    def location(self):
+        return self.expr.location
+
     def accept(self, visitor):
         return visitor.visit(self)

@@ -1,4 +1,5 @@
-from compiler.ast import StmtNode, ExprNode, BlockNode
+from compiler.ast.stmt_node import StmtNode
+from compiler.ast import block_node
 
 class IfNode(StmtNode):
     cond = None
@@ -7,7 +8,7 @@ class IfNode(StmtNode):
     def __init__(self, loc, cond, then_body, else_body):
         super().__init__(loc)
         self.cond = cond
-        self.then_body = BlockNode.warp_block(then_body)
-        self.else_body = BlockNode.warp_block(else_body)
+        self.then_body = block_node.BlockNode.warp_block(then_body)
+        self.else_body = block_node.BlockNode.warp_block(else_body)
     def accept(self, visitor):
         return visitor.visit(self)

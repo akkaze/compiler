@@ -1,5 +1,5 @@
-from compiler.type import ClassType
-from compiler.entity import Entity
+from compiler.typ.class_type import ClassType
+from compiler.entity.entity import Entity
 
 class ClassEntity(Entity):
     member_vars = []

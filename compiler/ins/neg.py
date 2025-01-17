@@ -1,5 +1,5 @@
-from compiler.ins import Instruction
-
+from compiler.ins.instruction import Instruction
+from compiler.ins.operand.reference import Reference
 class Neg(Instruction):
     operand = None
     def __init__(self, operand):

@@ -2,7 +2,9 @@ from compiler.ins import Instruction
 from compiler.ins.operand import Immediate
 from enum import Enum
 
+
 class CJump(Instruction):
+
     class Type(Enum):
         EQ = 1
         NE = 2
@@ -36,20 +38,23 @@ class CJump(Instruction):
             self.true_label = args[3]
             self.false_label = args[4]
         super().__init__()
+
     def replace_use(self, ffrom, to):
         if self.bring_out and (ffrom in self.bring_out):
             new_bring_out = set()
             for reference in self.bring_out:
                 new_bring_out.add(reference.replace(ffrom, to))
             self.bring_out = new_bring_out
-        
+
         if self.type == CJump.Type.BOOL:
             self.cond = self.cond.replace(ffrom, to)
         else:
             self.left = self.left.replace(ffrom, to)
             self.right = self.right.replace(ffrom, to)
+
     def replace_def(self, ffrom, to):
         pass
+
     def calc_def_and_use(self):
         if self.type == CJump.Type.BOOL:
             self.m_use |= self.cond.get_all_ref()
@@ -59,6 +64,7 @@ class CJump(Instruction):
         if self.bring_out:
             self.m_use |= self.bring_out
         self.m_all_ref |= self.m_use
+
     @property
     def name(self):
         if self.type == CJump.Type.EQ:
@@ -75,6 +81,7 @@ class CJump(Instruction):
             return 'jle'
         else:
             raise InternalError('invalid compare operator')
+
     @staticmethod
     def not_name(raw):
         if raw == 'je':
@@ -108,9 +115,10 @@ class CJump(Instruction):
             return 'jge'
         else:
             raise InternalError('invalid compare operator')
+
     def accept(self, translator):
         return translator.visit(self)
- 
+
     def __str__(self):
         if self.type == CJump.Type.BOOL:
             return 'cjump ' + str(self.cond) + ', ' + \

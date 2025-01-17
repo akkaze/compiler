@@ -1,5 +1,6 @@
 from enum import Enum
-from compiler.ir import Expr
+from compiler.ir.expr import Expr
+
 
 class Binary(Expr):
     class BinaryOp(Enum):
@@ -22,13 +23,15 @@ class Binary(Expr):
         LOGIC_AND = 17
         LOGIC_OR = 18
 
-
-    left = None
-    right = None
-    operator = None
     def __init__(self, left, operator, right):
+        assert isinstance(left, Expr), 'real type ' + str(type(left))
+        assert isinstance(right, Expr), 'real type ' + str(type(right))
         self.left = left
         self.operator = operator
         self.right = right
+
     def accept(self, emitter):
         return emitter.visit(self)
+
+    def __str__(self):
+        return str(self.left) + ' ' + str(self.operator) + ' ' + str(self.right)

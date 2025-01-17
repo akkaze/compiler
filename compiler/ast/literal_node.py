@@ -1,9 +1,6 @@
-from compiler.type import Type
-from compiler.ast import ExprNode
+from compiler.ast.expr_node import ExprNode
 
 class LiteralNode(ExprNode):
-    location = None
-    type = None
     
     def __init__(self, loc, type):
         self.location = loc

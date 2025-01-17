@@ -15,4 +15,7 @@ class Jmp(Instruction):
         return translator.visit(self)
  
     def __str__(self):
-        return 'jump ' + str(self.dest)
+        return 'jmp ' + str(self.dest)
+
+    def __repr__(self):
+        return 'jmp ' + str(self.dest)

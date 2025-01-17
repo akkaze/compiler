@@ -1,5 +1,4 @@
-from compiler.type import Type
-from compiler.ast import ExprNode
+from compiler.ast.expr_node import ExprNode
 from enum import Enum
 
 
@@ -18,7 +17,7 @@ class UnaryOpNode(ExprNode):
     expr = None
     type = None
     amount = 0
-    
+
     def __init__(self, op, expr):
         self.operator = op
         self.expr = expr
@@ -32,5 +31,6 @@ class UnaryOpNode(ExprNode):
     @property
     def location(self):
         return self.expr.location
+
     def accept(self, visitor):
         return visitor.visit(self)

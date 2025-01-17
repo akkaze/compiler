@@ -2,23 +2,13 @@ from compiler.ins.operand import *
 from compiler.options import options
 import logging
 
+
 class NaiveAllocator:
-    function_entities = None
-    rax = None
-    rbx = None
-    rcx = None
-    rdx = None
-    rsi = None
-    rdi = None
-    rsp = None
-    rbp = None
-    registers = None
-    param_registers = None
     def __init__(self, emitter, register_config):
         self.function_entities = emitter.function_entities
         self.registers = register_config.registers
         self.param_registers = register_config.param_registers
-        
+
         self.rax = self.registers[0]
         self.rbx = self.registers[1]
         self.rcx = self.registers[2]
@@ -42,10 +32,13 @@ class NaiveAllocator:
                 for ref in ins.ddef:
                     ref.ref_times += 1
                     all_ref.add(ref)
-        to_sort = sorted(all_ref, key = lambda x: -x.ref_times)
+        to_sort = sorted(all_ref, key=lambda x: -x.ref_times)
         to_allocate = [1, 12, 13, 14, 15]
+
         if options.print_naive_allocator_info:
             logging.error('naive allocator : ' + entity.name)
+
+        ref_base = 0
         for i in range(len(to_sort)):
             if i < len(to_allocate):
                 ref = to_sort[i]
@@ -56,19 +49,25 @@ class NaiveAllocator:
                 entity.reg_used.append(self.registers[to_allocate[i]])
 
                 if options.print_naive_allocator_info:
-                    logging.error(ref.name + ' -> ' + str(ref.reg))
+                    logging.info(ref.name + ' -> ' + str(ref.reg))
+            else:
+                ref = to_sort[i]
+                ref_base += options.REG_SIZE
+                ref.set_offset(-ref_base, self.rbp)
+                if options.print_naive_allocator_info:
+                    logging.info(ref.name + ' -> ' +
+                                 '[{0}+{1}]'.format(ref.reg, ref.offset))
         entity.reg_used.append(self.rbp)
 
-        # === Frame layout === 
+        # === Frame layout ===
         # virtual stack
         # local variable
         # parameter
         # -----------------<-bp
         # save regs
         # return address
-        lvar_base = 0
+        lvar_base = ref_base
         stack_base = 0
-        saved_temp_base = 0
         params = entity.params
         for i in range(len(params)):
             param = params[i]
@@ -79,8 +78,8 @@ class NaiveAllocator:
             else:
                 ref.alias = param.source
         stack_base = lvar_base
-        stack_base += entity.scope.locate_local_variable(\
-                        lvar_base, options.STACK_VAR_ALIGNMENT_SIZE)
+        stack_base += entity.scope.locate_local_variable(
+            lvar_base, options.STACK_VAR_ALIGNMENT_SIZE)
         for var in entity.scope.all_local_variables():
             var.reference.set_offset(-var.offset, self.rbp)
 

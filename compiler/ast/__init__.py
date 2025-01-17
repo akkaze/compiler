@@ -9,7 +9,6 @@ from compiler.ast.funcall_node import FuncallNode
 from compiler.ast.literal_node import LiteralNode
 from compiler.ast.boolliteral_node import BoolLiteralNode
 from compiler.ast.integerliteral_node import IntegerLiteralNode
-from compiler.ast.stringliteral_node import StringLiteralNode
 from compiler.ast.lhs_node import LHSNode
 from compiler.ast.aref_node import ArefNode
 from compiler.ast.variable_node import VariableNode
@@ -19,15 +18,10 @@ from compiler.ast.unaryop_node import UnaryOpNode
 from compiler.ast.prefixop_node import PrefixOpNode
 from compiler.ast.suffixop_node import SuffixOpNode
 from compiler.ast.stmt_node import StmtNode
-from compiler.ast.block_node import BlockNode
 from compiler.ast.break_node import BreakNode
 from compiler.ast.continue_node import ContinueNode
 from compiler.ast.exprstmt_node import ExprStmtNode
-from compiler.ast.for_node import ForNode
-from compiler.ast.if_node import IfNode
 from compiler.ast.return_node import ReturnNode
-from compiler.ast.while_node import WhileNode
 from compiler.ast.definition_node import DefinitionNode
 from compiler.ast.classdef_node import ClassDefNode
-from compiler.ast.functiondef_node import FunctionDefNode
 from compiler.ast.variabledef_node import VariableDefNode

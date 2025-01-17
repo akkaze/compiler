@@ -3,6 +3,7 @@ from compiler.backend import BasicBlock
 from collections import deque
 from compiler.options import *
 import logging
+import sys
 global options
 class ControlFlowAnalyzer:
     function_entities = None
@@ -55,11 +56,13 @@ class ControlFlowAnalyzer:
         if bb:
             bbs.append(bb)
 
+        # link edge
         for bb in bbs:
             for label in bb.jump_to:
                 bb.successor.append(label.basic_block)
                 label.basic_block.predecessor.append(bb)
         entity.bbs = bbs
+        # disable direction ins access, so ins must be accessed by basicblocks
         entity.ins = None
 
     def build_controlflow_graph(self, entity):
@@ -78,7 +81,7 @@ class ControlFlowAnalyzer:
 
     def optimize(self, entity):
         modified = True
-        while(modified):
+        while modified:
             modified = False
             now = None
             for bb in entity.bbs:
@@ -98,7 +101,7 @@ class ControlFlowAnalyzer:
                         entity.bbs.remove(next_bb)
                         now.successor.remove(next_bb)
                         break
-
+            
             useless_basic_block = []
             for to_remove in entity.bbs:
                 if len(to_remove.ins) < 2:
@@ -131,20 +134,21 @@ class ControlFlowAnalyzer:
                                 suc.predecessor.append(pre)
                     if modified:
                         break
-                for bb in entity.bbs:
-                    if len(bb.predecessor) == 0 and \
-                        bb.label != entity.begin_label_ins:
-                        modified = True
-                        useless_basic_block.append(bb)
 
-                for bb in entity.bbs:
-                    if len(bb.successor) == 2 and \
-                        bb.successor[0] == bb.successor[1]:
-                        logging.info('find redundant Cjump')
+            for bb in entity.bbs:
+                if len(bb.predecessor) == 0 and \
+                    bb.label != entity.begin_label_ins:
+                    modified = True
+                    useless_basic_block.append(bb)
 
-                for bb in useless_basic_block:
-                    if bb in entity.bbs:
-                        entity.bbs.remove(bb)
+            for bb in entity.bbs:
+                if len(bb.successor) == 2 and \
+                    bb.successor[0] == bb.successor[1]:
+                    logging.debug('find redundant Cjump', file=sys.stderr)
+
+            for bb in useless_basic_block:
+                if bb in entity.bbs:
+                    entity.bbs.remove(bb)
 
     def layout_basic_block(self, entity):
         bbs = entity.bbs
@@ -158,7 +162,7 @@ class ControlFlowAnalyzer:
                 bb.layouted = True
                 for suc in bb.successor:
                     if not suc.layouted:
-                        last = bb.ins[len(bb.ins) - 1]
+                        last = bb.ins[-1]
                         if isinstance(last, Jmp):
                             del bb.ins[len(bb.ins) - 1]
                         elif isinstance(last, CJump):
@@ -177,9 +181,9 @@ class ControlFlowAnalyzer:
                 logging.info('BE INLINED')
                 continue
             for bb in function_entity.bbs:
-                log_str = '---- b ---- jump to:'
+                log_str = '---- b ----  jump to:'
                 for label in bb.jump_to:
-                    log_str += ' ' + label.name
+                    log_str += '\t' + label.name
                 logging.info(log_str)
                 for ins in bb.ins:
                     logging.info(str(ins))

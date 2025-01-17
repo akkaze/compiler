@@ -28,3 +28,9 @@ class Return(Instruction):
             return 'ret ' + str(self.ret)
         else:
             return 'ret'
+
+    def __repr__(self):
+        if self.ret:
+            return 'ret ' + str(self.ret)
+        else:
+            return 'ret'

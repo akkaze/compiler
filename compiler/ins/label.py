@@ -1,16 +1,17 @@
 from compiler.ins import Instruction
+
+
 class Label(Instruction):
-    name = ''
-    basic_block = None
-    bring_use = None
 
     def __init__(self, name):
         self.bring_use = dict()
+        self.basic_block = None
         self.name = name
         super().__init__()
+
     def replace_use(self, fffrom, to):
         pass
-    
+
     def replace_def(self, fffrom, to):
         pass
 
@@ -21,7 +22,10 @@ class Label(Instruction):
         pass
 
     def accept(self, translator):
-        return translator.visit(self) 
+        return translator.visit(self)
 
     def __str__(self):
+        return self.name
+
+    def __repr__(self):
         return self.name

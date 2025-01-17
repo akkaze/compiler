@@ -5,18 +5,17 @@ class Immediate(Operand):
     class Type(Enum):
         LABEL = 1
         INTEGER = 2
-
-    value = 0
-    label = ''
-    type = None
     
     def __init__(self, *args):
         if isinstance(args[0], int):
-            self.value = args[0]
+            self.value = int(args[0])
             self.type = Immediate.Type.INTEGER
+        elif isinstance(args[0], str):
+           self.label = args[0]
+           self.type = Immediate.Type.LABEL
         else:
-            self.label = args[0]
-            self.type = Immediate.Type.LABEL
+            raise TypeError('expect int or string, but got ' + str(type(args[0])))
+
     
     def __hash__(self):
         if self.type == Immediate.Type.INTEGER:
@@ -52,9 +51,9 @@ class Immediate(Operand):
         if self.type == Immediate.Type.INTEGER:
             return str(self.value)
         else:
-            return label
+            return self.label
     def __str__(self): 
         if self.type == Immediate.Type.INTEGER:
             return str(self.value)
         else:
-            return label
+            return self.label

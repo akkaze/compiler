@@ -2,26 +2,13 @@ from compiler.entity import *
 from compiler.ins import *
 from compiler.ins.operand import *
 from compiler.options import options
-
+from compiler.entity.variable_entity import VariableEntity
+from compiler.entity.string_const_entity import StringConstEntity
 global options
+
 
 class Translator:
     GLOBAL_PREFIX = '__global__'
-    function_entities = None
-    global_scope = None
-    global_initializer = None
-    rax = None
-    rbx = None
-    rcx = None
-    rdx = None
-    rsi = None
-    rdi = None
-    rsp = None
-    rbp = None
-
-    registers = None
-    param_registers = None
-    asm = None
 
     def __init__(self, emitter, register_config):
         self.asm = []
@@ -30,7 +17,7 @@ class Translator:
         self.global_initializer = emitter.global_initializer
         self.registers = register_config.registers
         self.param_registers = register_config.param_registers
-        
+
         self.rax = self.registers[0]
         self.rbx = self.registers[1]
         self.rcx = self.registers[2]
@@ -40,13 +27,27 @@ class Translator:
         self.rbp = self.registers[6]
         self.rsp = self.registers[7]
 
-
     def translate(self):
+        self.add('global main')
+        self.add("extern printf, scanf, puts, gets, sprintf, sscanf, getchar, strlen, strcmp, strcpy, strncpy, malloc, memcpy")
         self.add('section .data')
         for name, entity in self.global_scope.entities.items():
             if isinstance(entity, VariableEntity):
-                self.add_label(GLOBAL_PREFIX + entity.name)
+                self.add_label(Translator.GLOBAL_PREFIX + entity.name)
                 self.add('dq 0')
+            elif isinstance(entity, StringConstEntity):
+                name = entity.asm_name
+                value = entity.value
+                self.add('dd ' + str(len(value)))
+                self.add_label(name)
+                tmp_str = 'db'
+                for i in range(len(value)):
+                    tmp_str += ' '
+                    x = ord(value[i])
+                    tmp_str += str(x)
+                    tmp_str += ','
+                tmp_str += ' 0'
+                self.add(tmp_str)
         self.add('')
 
         self.add('section .text')
@@ -57,9 +58,10 @@ class Translator:
             self.add('ALIGN 16')
             self.translate_function(entity)
             self.add('')
-            
+
+        self.paste_libfunctions()
         return self.asm
-    
+
     def locate_frame(self, entity):
         saved_reg_num = 0
         for reg in entity.reg_used:
@@ -70,7 +72,7 @@ class Translator:
         total = 0
         # last for retrun address
         source_base = saved_reg_num * options.REG_SIZE + \
-                    options.REG_SIZE 
+            options.REG_SIZE
         params = entity.params
         for i in range(len(params)):
             param = params[i]
@@ -83,17 +85,17 @@ class Translator:
                 param.source.set_offset(source_base, self.rbp)
                 source_base += param.type.size
                 if ref.is_unknown:
-                    ref.set_offset(param.source.offset, \
-                    param.source.reg)
+                    ref.set_offset(param.source.offset,
+                                   param.source.reg)
         total = lvar_base + entity.local_variable_offset
-        total += (options.FRAME_ALIGNMENT_SIZE - \
-                (total + options.REG_SIZE + \
-                options.REG_SIZE * saved_reg_num) % \
-                options.FRAME_ALIGNMENT_SIZE) % \
-                options.FRAME_ALIGNMENT_SIZE
+        total += (options.FRAME_ALIGNMENT_SIZE -
+                  (total + options.REG_SIZE +
+                   options.REG_SIZE * saved_reg_num) %
+                  options.FRAME_ALIGNMENT_SIZE) % \
+            options.FRAME_ALIGNMENT_SIZE
 
         entity.frame_size = total
-                    
+
     def translate_function(self, entity):
         self.add_label(entity.asm_name)
         start_pos = len(self.asm)
@@ -104,11 +106,11 @@ class Translator:
                 if len(entity.calls) != 0 and entity.frame_size != 0:
                     self.add('add', self.rsp, Immediate(entity.frame_size))
                 for i in range(len(entity.reg_used) - 1, -1, -1):
-                    reg  = entity.reg_used[i]
+                    reg = entity.reg_used[i]
                     if reg.is_callee_save:
                         self.add('pop', reg)
                 self.add('ret')
-        
+
         prologue = None
         backup = self.asm
         self.asm = []
@@ -126,7 +128,11 @@ class Translator:
             params = entity.params
             for param in params:
                 if not param.reference == param.source:
-                    self.add('mov', param.reference, param.source)
+                    if not param.reference.is_address:
+                        self.add('mov', param.reference, param.source)
+                    else:
+                        self.add('mov', self.rcx, param.source)
+                        self.add('mov', param.reference, self.rcx)
         self.add('')
 
         prologue = self.asm
@@ -147,8 +153,8 @@ class Translator:
                     s = s.replace('qword', 'dword')
                 else:
                     if s == 'rax' or s == 'rbx' or s == 'rcx' or \
-                        s == 'rdx' or s == 'rsi' or s == 'rdi' or \
-                        s == 'rsp' or s == 'rbp':
+                            s == 'rdx' or s == 'rsi' or s == 'rdi' or \
+                            s == 'rsp' or s == 'rbp':
                         s = s.replace('r', 'e')
                     else:
                         s = s + 'd'
@@ -159,9 +165,12 @@ class Translator:
             op = args[0]
             l = args[1]
             r = args[2]
-            if not op == 'mov' or not l.nasm == r.nasm:
-                self.asm.append('\t' + op + ' ' + \
+            if op == 'mov' and l.nasm == r.nasm:
+                return
+            else:
+                self.asm.append('\t' + op + ' ' +
                                 l.nasm + ', ' + r.nasm)
+
     def add_label(self, name):
         self.asm.append(name + ':')
 
@@ -172,17 +181,21 @@ class Translator:
         if operand.is_direct:
             self.add('mov', reg, operand)
         else:
-            if base.is_register:
-                self.add('mov', reg, base)
+            if operand.base.is_register:
+                self.add('mov', reg, operand.base)
                 self.add('mov', reg, Address(reg))
+            elif operand.base.is_offset:
+                self.add('mov', self.rcx, operand.base)
+                self.add('mov', reg, Address(
+                    self.rcx, operand.index, operand.mul, operand.add))
         return 0
 
-    def left_can_bt_memory(self, name):
+    def left_can_be_memory(self, name):
         return name == 'add' or name == 'sub' or name == 'sor'
 
     def visit_compare(self, left, right):
         if left.is_direct and right.is_direct and \
-            not (left.is_address and right.is_address):
+                not (left.is_address and right.is_address):
             self.add('cmp', left, right)
         else:
             self.add_move(self.rax, left)
@@ -191,6 +204,7 @@ class Translator:
             else:
                 self.add_move(self.rdx, right)
                 self.add('cmp', self.rax, self.rdx)
+
     def simplify_address(self, addr, reg1, reg2):
         if not addr.index:
             if addr.base.is_register:
@@ -208,13 +222,14 @@ class Translator:
                     addr.index_nasm = reg1
             else:
                 self.add_move(reg1, addr.base)
-                self.addr.base_nasm = reg1
+                addr.base_nasm = reg1
                 if addr.index.is_register:
                     return 1
                 else:
                     self.add_move(reg2, addr.index)
                     addr.index_nasm = reg2
                     return 2
+
     def is_address(self, operand):
         if isinstance(operand, Address):
             return True
@@ -227,13 +242,11 @@ class Translator:
 
     def visit(self, ins):
         if isinstance(ins, Bin) and \
-            not (isinstance(ins, Div) or isinstance(ins, Mod)):
+                not (isinstance(ins, Div) or isinstance(ins, Mod) or isinstance(ins, Sal) or isinstance(ins, Sar)):
             left = ins.left
             right = ins.right
             name = ins.name
-
-            if left.is_register or (left.is_register and \
-                self.left_can_be_memory(name) and not right.is_address):
+            if left.is_register or (left.is_direct and self.left_can_be_memory(name) and not right.is_address):
                 if right.is_direct:
                     if left.is_address and right.is_address:
                         self.add_move(self.rax, right)
@@ -257,6 +270,8 @@ class Translator:
                     self.add(name, self.rax, self.rdx)
         elif isinstance(ins, Div) or isinstance(ins, Mod):
             reg = None
+            left = ins.left
+            right = ins.right
             if isinstance(ins, Div):
                 reg = self.rax
             else:
@@ -276,10 +291,10 @@ class Translator:
             self.add('neg', ins.operand)
         elif isinstance(ins, Not):
             self.add('not', ins.operand)
-        elif isinstance(ins, Sal) or isinstance(ins, Sal):
-            if isinstance(right, Immediate):
-                self.add(ins.name + ' ' + ins.left.nasm + \
-                        ', ' + ins.right.nasm)
+        elif isinstance(ins, Sal) or isinstance(ins, Sar):
+            if isinstance(ins.right, Immediate):
+                self.add(ins.name + ' ' + ins.left.nasm +
+                         ', ' + ins.right.nasm)
             else:
                 self.add_move(self.rcx, ins.right)
                 self.add(ins.name + ' ' + ins.left.nasm + ', cl')
@@ -305,7 +320,7 @@ class Translator:
             if options.enable_global_register_allocation:
                 reg = left.reg
                 self.add(set + ' ' + reg.low_name)
-                self.add('movzx' + reg.name + ', ' + reg.low_name)
+                self.add('movzx ' + reg.name + ', ' + reg.low_name)
             else:
                 self.add(set + ' al')
                 self.add('movzx rax, al')
@@ -317,23 +332,35 @@ class Translator:
                 self.add('mov', ins.dest, ins.src)
             else:
                 if is_add_left and is_add_right:
-                    if isinstance(ins.src, Address):
-                        self.simplify_address(\
-                            ins.src, self.rax, self.rdx)
-                    self.add('mov', self.rdx, ins.src)
-                    if isinstance(ins.dest, Address):
-                        self.simplify_address(\
-                            ins.src, self.rax, self.rcx)
-                    self.add('mov', ins.dest, self.rdx)
+                    if isinstance(ins.src, Address) or isinstance(ins.dest, Address):
+                        if isinstance(ins.src, Address):
+                            self.simplify_address(
+                                ins.src, self.rax, self.rdx)
+                        self.add('mov', self.rdx, ins.src)
+                        if isinstance(ins.dest, Address):
+                            self.simplify_address(
+                                ins.dest, self.rax, self.rcx)
+                        self.add('mov', ins.dest, self.rdx)
+                    else:
+                        self.add_move(self.rcx, ins.src)
+                        self.add('mov', ins.dest, self.rcx)
                 else:
                     if isinstance(ins.dest, Address):
-                        self.simplify_address(\
+                        self.simplify_address(
                             ins.dest, self.rax, self.rcx)
                     if isinstance(ins.src, Address):
-                        self.simplify_address(\
+                        self.simplify_address(
                             ins.src, self.rax, self.rcx)
                     self.add('mov', ins.dest, ins.src)
-
+        elif isinstance(ins, Lea):
+            if not options.enable_global_register_allocation:
+                self.simplify_address(ins.addr, self.rax, self.rcx)
+            ins.addr.show_size = False
+            if ins.dest.is_register:
+                self.add('lea', ins.dest, ins.addr)
+            else:
+                self.add('lea', self.rax, ins.addr)
+                self.add('mov', ins.dest, self.rax)
         elif isinstance(ins, Call):
             operands = ins.operands
             for i in range(len(operands) - 1, -1, -1):
@@ -345,11 +372,10 @@ class Translator:
                     else:
                         self.add_move(self.rax, operands[i])
                         self.add('push', self.rax)
-            self.add('call '+ ins.entity.asm_name)
+            self.add('call ' + ins.entity.asm_name)
             if len(operands) > len(self.param_registers):
-                self.add('add', self.rsp, Immediate(\
-                    len(operands) - len(self.param_registers), \
-                    options.REG_SIZE))
+                self.add('add', self.rsp, Immediate(
+                    (len(operands) - len(self.param_registers)) * options.REG_SIZE))
             if ins.ret:
                 self.add('mov', ins.ret, self.rax)
         elif isinstance(ins, Return):
@@ -369,15 +395,15 @@ class Translator:
                         self.add_move(self.rax, ins.cond)
                         self.add('test', self.rax, self.rax)
                     if ins.fall_through == ins.true_label:
-                        self.add('jz ' + ins.false_label.name )
+                        self.add('jz ' + ins.false_label.name)
                     elif ins.fall_through == ins.false_label:
                         self.add('jnz ' + ins.true_label.name)
                     else:
                         self.add('jnz ' + ins.true_label.name)
-                        self.add_jump(ins.fasle_label.name)
+                        self.add_jump(ins.false_label.name)
             else:
                 name = ins.name
-                left = ins.left 
+                left = ins.left
                 right = ins.right
                 if isinstance(left, Immediate):
                     t = left
@@ -399,11 +425,24 @@ class Translator:
             self.add_label(ins.name)
         elif isinstance(ins, Push):
             if not ins.operand.is_register:
-                raise InternalError('push ' + \
-                        str(ins.operand) + ' is not register')
+                raise InternalError('push ' +
+                                    str(ins.operand) + ' is not register')
             self.add('push', ins.operand)
         elif isinstance(ins, Pop):
             if not ins.operand.is_register:
-                raise InternalError('pop ' + \
-                        str(ins.operand) + ' is not register')
+                raise InternalError('pop ' +
+                                    str(ins.operand) + ' is not register')
             self.add('pop', ins.operand)
+
+    def left_can_be_memory(self, name):
+        return name == "add" or name == "sub" or name == "xor"
+
+    def paste_libfunctions(self):
+        from pathlib import Path
+        cur_path = Path(__file__)
+        lib_path = cur_path.parent.parent / 'lib' / 'lib.s'
+        with open(lib_path) as lib_file:
+            lib_lines = lib_file.readlines()
+        self.add("\n;========== LIB BEGIN ==========")
+        for lib_line in lib_lines:
+            self.add(lib_line)

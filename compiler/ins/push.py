@@ -4,7 +4,7 @@ class Push(Instruction):
     operand = None
     def __init__(self, operand):
         self.operand = operand
-        super.__init__()
+        super(Push, self).__init__()
     def replace_use(self, ffrom, to):
         self.operand = self.operand.replace(ffrom, to)
     def replace_def(self, ffrom, to):
@@ -18,4 +18,7 @@ class Push(Instruction):
         return translator.visit(self)
  
     def __str__(self):
+        return 'push ' + str(self.operand)
+
+    def __repr__(self):
         return 'push ' + str(self.operand)

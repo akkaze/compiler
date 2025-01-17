@@ -1,8 +1,6 @@
-from compiler.ast import StmtNode
-from compiler.type import Type
+from compiler.ast.stmt_node import StmtNode
 
 class ExprStmtNode(StmtNode):
-    expr = None
     def __init__(self, loc, expr):
         super().__init__(loc)
         self.expr = expr

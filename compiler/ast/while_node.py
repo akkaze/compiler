@@ -1,4 +1,5 @@
-from compiler.ast import StmtNode, ExprNode
+from compiler.ast.stmt_node import StmtNode
+from compiler.ast.block_node import BlockNode
 
 class WhileNode(StmtNode):
     body = None

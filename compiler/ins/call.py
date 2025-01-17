@@ -1,17 +1,15 @@
 from compiler.ins import Instruction
 
-class Call(Instruction):
-    entity = None
-    operands = None
-    ret = None
-    caller_save = None
-    used_parameter_register = None
 
+class Call(Instruction):
     def __init__(self, entity, operands):
         self.entity = entity
         self.operands = operands
         self.ret = None
+        self.caller_save = set()
+        self.used_parameter_register = set()
         super().__init__()
+
     def replace_use(self, ffrom, to):
         new_operands = []
         for operand in self.operands:
@@ -42,7 +40,7 @@ class Call(Instruction):
 
     def accept(self, translator):
         return translator.visit(self)
- 
+
     def __str__(self):
         args = ''
         for operand in self.operands:

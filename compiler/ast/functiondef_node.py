@@ -1,5 +1,5 @@
-from compiler.ast import DefinitionNode
-from compiler.entity import FunctionEntity
+from compiler.ast.definition_node import DefinitionNode
+from compiler.entity.function_entity import FunctionEntity
 
 class FunctionDefNode(DefinitionNode):
     entity = None

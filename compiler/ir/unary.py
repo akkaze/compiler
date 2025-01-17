@@ -6,9 +6,6 @@ class Unary(Expr):
         LOGIC_NOT = 2
         BIT_NOT = 3
 
-    expr = None
-    operator = None
-
     def __init__(self, op, expr):
         super().__init__()
         self.operator = op

@@ -1,14 +1,16 @@
 from compiler.ins.operand import Operand
+from compiler.utils.internal_error import InternalError
 
 class Address(Operand):
-    base = None
-    index = None
-    mul = 1
-    add = 0
-    show_size = True
-    m_base_nasm = None
-    m_index_nasm = None
+
     def __init__(self, *args):
+        self.base = None
+        self.index = None
+        self.mul = 1
+        self.add = 0
+        self.show_size = True
+        self.m_base_nasm = None
+        self.m_index_nasm = None
         if len(args) == 1:
             self.base = args[0]
             if isinstance(self.base, Address):
@@ -18,10 +20,9 @@ class Address(Operand):
             self.index = args[1]
             self.mul = args[2]
             self.add = args[3]
-
-            if isinstance(args[0], Address) or  \
-                isinstance(args[1], Address):
+            if isinstance(args[0], Address) or  isinstance(args[1], Address):
                 raise InternalError('nested address')
+
     def get_all_ref(self):
         ret = set()
         if self.base:
@@ -33,7 +34,7 @@ class Address(Operand):
     def replace(self, ffrom, to):
         if self.base:
             self.base = self.base.replace(ffrom, to)
-        elif self.index:
+        if self.index:
             self.index = self.index.replace(ffrom, to)
         return self
 
@@ -46,10 +47,20 @@ class Address(Operand):
     @base_nasm.setter
     def base_nasm(self, value):
         self.m_base_nasm = value
+
+    @property
+    def index_nasm(self):
+        if self.m_index_nasm:
+            return self.m_index_nasm
+        else:
+            return self.index
+    @index_nasm.setter
+    def index_nasm(self, value):
+        self.m_index_nasm = value
+
     @property
     def base_only(self):
-        if self.base and self.index and \
-            self.mul == 1 and self.add == 0:
+        if self.base and self.index == None and self.mul == 1 and self.add == 0:
             return True
         return False
 
@@ -82,7 +93,8 @@ class Address(Operand):
                 ret += ' * ' + str(self.mul)
         if self.add != 0:
             ret += gap + str(self.add)
-        return ret + ']'
+        ret += ']'
+        return ret
 
     def __hash__(self):
         hash_code = 0x93
@@ -102,10 +114,11 @@ class Address(Operand):
     def __str__(self):
         ret = ''
         gap = ''
-        if self.show_size:
-            ret += 'qword ['
-        else:
-            ret += '['
+        # if self.show_size:
+        #     ret += 'qword ['
+        # else:
+        #     ret += '['
+        ret += '['
         if self.base:
             ret += gap + str(self.base)
             gap = ' + '

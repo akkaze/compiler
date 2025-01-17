@@ -3,3 +3,5 @@ class Div(Bin):
     def __init__(self, left, right):
         super().__init__(left, right)
         self.name = 'div'
+    def accept(self, translator):
+        translator.visit(self)

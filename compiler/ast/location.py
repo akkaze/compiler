@@ -1,9 +1,8 @@
 from antlr4 import ParserRuleContext, Token
 from antlr4.tree.Tree import TerminalNode
 
+
 class Location:
-    line = -1
-    column = -1
     def __init__(self, *args):
         if len(args) == 1:
             if isinstance(args[0], Token):

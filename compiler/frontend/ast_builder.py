@@ -2,14 +2,36 @@ from antlr4 import *
 from compiler.parser import MalicListener
 from compiler.frontend import AST
 from compiler.entity import *
-from compiler.type import *
 from compiler.ast import *
-from compiler.utils import InternalError
+from compiler.typ.integer_type import IntegerType
+from compiler.typ.class_type import ClassType
+from compiler.typ.array_type import ArrayType
+from compiler.typ.bool_type import BoolType
+from compiler.typ.string_type import StringType
+from compiler.typ.void_type import VoidType
+from compiler.entity.variable_entity import VariableEntity
+from compiler.entity.parameter_entity import ParameterEntity
+from compiler.entity.class_entity import ClassEntity
+from compiler.entity.member_entity import MemberEntity
+from compiler.ast.block_node import BlockNode
+from compiler.ast.if_node import IfNode
+from compiler.ast.while_node import WhileNode
+from compiler.ast.for_node import ForNode
+from compiler.ast.functiondef_node import FunctionDefNode
+from compiler.entity.function_entity import FunctionEntity
+from compiler.ast.functiondef_node import FunctionDefNode
+from compiler.ast.stringliteral_node import StringLiteralNode
+from compiler.utils.internal_error import InternalError
+from compiler.utils.semantic_error import SemanticError
+
+
 class ASTBuilder(MalicListener):
     ast = None
     map = None
+
     def __init__(self):
         self.map = dict()
+
     def exitCompilationUnit(self, ctx):
         definition_nodes = []
         function_entities = []
@@ -26,8 +48,8 @@ class ASTBuilder(MalicListener):
                 class_entities.append(node.entity)
             else:
                 raise InternalError('Invalid definition node ' + node.name)
-        self.ast = AST(definition_nodes, class_entities, 
-                function_entities, variable_entities)
+        self.ast = AST(definition_nodes, class_entities,
+                       function_entities, variable_entities)
 
     def exitClassDefinition(self, ctx):
         vars = []
@@ -42,12 +64,12 @@ class ASTBuilder(MalicListener):
             funcs.append(node)
             entity = node.entity
             if entity.is_constructor:
-                constuctor = entity
-                if entity.name != CONSTUCTOR_NAME + name:
-                    raise SemanticError(Location(ctx.name), 
-                                        'wrong namee of constructor' + 
-                                        entity.name + 'and' + 
-                                        CONSTRUCTOR_NAME + name)
+                constructor = entity
+                if entity.name != ClassType.CONSTRUCTOR_NAME + name:
+                    raise SemanticError(Location(ctx.name),
+                                        'wrong namee of constructor' +
+                                        entity.name + 'and' +
+                                        ClassType.CONSTRUCTOR_NAME + name)
         entity = ClassEntity(Location(ctx.name), name, vars, funcs)
         entity.constructor = constructor
         self.map[ctx] = ClassDefNode(entity)
@@ -59,28 +81,30 @@ class ASTBuilder(MalicListener):
             params.append(node)
         entity = None
         if ctx.ret is None:
-            entity = FunctionEntity(Location(ctx.name), \
-                                    ClassType(ctx.name.text), \
-                                    CONSTURCTOR_NAME + ctx.name.getTxt(), \
+            entity = FunctionEntity(Location(ctx.name),
+                                    ClassType(ctx.name.text),
+                                    ClassType.CONSTRUCTOR_NAME + ctx.name.text,
                                     params, self.map.get(ctx.block()))
             entity.is_constructor = True
         else:
-            entity = FunctionEntity(Location(ctx.name), \
-                                    self.map.get(ctx.ret), \
-                                    ctx.name.text, \
+            entity = FunctionEntity(Location(ctx.name),
+                                    self.map.get(ctx.ret),
+                                    ctx.name.text,
                                     params, self.map.get(ctx.block()))
         self.map[ctx] = FunctionDefNode(entity)
 
     def exitVariableDefinition(self, ctx):
-        entity = VariableEntity(Location(ctx.Identifier()), \
-                                self.map.get(ctx.typeType()), \
-                                ctx.Identifier().getText(), \
+        entity = VariableEntity(Location(ctx),
+                                self.map.get(ctx.typeType()),
+                                ctx.Identifier().getText(),
                                 self.get_expr(ctx.expression()))
         self.map[ctx] = VariableDefNode(entity)
+
     def exitParameter(self, ctx):
-        self.map[ctx] = ParameterEntity(Location(ctx), \
-                                    self.map.get(ctx.typeType()),\
-                                    ctx.Identifier().getText())
+        self.map[ctx] = ParameterEntity(Location(ctx),
+                                        self.map.get(ctx.typeType()),
+                                        ctx.Identifier().getText())
+
     def exitPrimitiveType(self, ctx):
         stype = ctx.ttype.text
         if stype == 'bool':
@@ -106,6 +130,7 @@ class ASTBuilder(MalicListener):
             self.map[ctx] = base_type
         else:
             self.map[ctx] = ArrayType(base_type, dimension)
+
     def exitBlock(self, ctx):
         stmts = []
         for item in ctx.statement():
@@ -113,45 +138,59 @@ class ASTBuilder(MalicListener):
             if stmt:
                 stmts.append(stmt)
         self.map[ctx] = BlockNode(Location(ctx), stmts)
+
     def exitBlockStmt(self, ctx):
         self.map[ctx] = self.map.get(ctx.block())
+
     def exitVarDefStmt(self, ctx):
         self.map[ctx] = self.map.get(ctx.variableDefinition())
+
     def exitIfStmt(self, ctx):
-        self.map[ctx] = IfNode(Location(ctx), \
-                            self.get_expr(ctx.expression()), \
-                            self.get_stmt(ctx.statement(0)), \
-                            self.get_stmt(ctx.statement(1)))
+        self.map[ctx] = IfNode(Location(ctx),
+                               self.get_expr(ctx.expression()),
+                               self.get_stmt(ctx.statement(0)),
+                               self.get_stmt(ctx.statement(1)))
+
     def exitForStmt(self, ctx):
-        self.map[ctx] = ForNode(Location(ctx), \
-                            self.get_expr(ctx.init), \
-                            self.get_expr(ctx.cond), \
-                            self.get_expr(ctx.incr), \
-                            self.get_stmt(ctx.statement()))
+        self.map[ctx] = ForNode(Location(ctx),
+                                self.get_expr(ctx.init),
+                                self.get_expr(ctx.cond),
+                                self.get_expr(ctx.incr),
+                                self.get_stmt(ctx.statement()))
+
     def exitWhileStmt(self, ctx):
-        self.map[ctx] = WhileNode(Location(ctx), \
-                            self.get_expr(ctx.expression()),\
-                            self.get_stmt(ctx.statement()))
+        self.map[ctx] = WhileNode(Location(ctx),
+                                  self.get_expr(ctx.expression()),
+                                  self.get_stmt(ctx.statement()))
+
     def exitReturnStmt(self, ctx):
-        self.map[ctx] = ReturnNode(Location(ctx), \
-                        self.get_expr(ctx.expression()))
+        self.map[ctx] = ReturnNode(Location(ctx),
+                                   self.get_expr(ctx.expression()))
+
     def exitBreakStmt(self, ctx):
         self.map[ctx] = BreakNode(Location(ctx))
+
     def exitContinueStmt(self, ctx):
         self.map[ctx] = ContinueNode(Location(ctx))
+
     def exitExprStmt(self, ctx):
-        self.map[ctx] = ExprStmtNode(Location(ctx), \
-                        self.get_expr(ctx.expression()))
+        self.map[ctx] = ExprStmtNode(Location(ctx),
+                                     self.get_expr(ctx.expression()))
+
     def exitBlankStmt(self, ctx):
         self.map[ctx] = None
+
     def exitPrimaryExpr(self, ctx):
         self.map[ctx] = self.map[ctx.primary()]
+
     def exitMemberExpr(self, ctx):
         self.map[ctx] = MemberNode(self.get_expr(ctx.expression()),
-                                    ctx.Identifier().getText())
+                                   ctx.Identifier().getText())
+
     def exitArefExpr(self, ctx):
-        self.map[ctx] = ArefNode(self.get_expr(ctx.expression(0),
-                                self.get_expr(ctx.expression(1))))
+        self.map[ctx] = ArefNode(self.get_expr(ctx.expression(0)),
+                                 self.get_expr(ctx.expression(1)))
+
     def exitExpressionList(self, ctx):
         exprs = []
         for x in ctx.expression():
@@ -159,20 +198,24 @@ class ASTBuilder(MalicListener):
         self.map[ctx] = exprs
 
     def exitAssignExpr(self, ctx):
-        self.map[ctx] = AssignNode(self.get_expr(ctx.expression(0)),\
-                            self.get_expr(ctx.expression(1)))
+        self.map[ctx] = AssignNode(self.get_expr(ctx.expression(0)),
+                                   self.get_expr(ctx.expression(1)))
+
     def exitFuncallExpr(self, ctx):
         args = []
         if not ctx.expressionList():
             args = []
         else:
             args = self.map.get(ctx.expressionList())
-        self.map[ctx] = FuncallNode(self.get_expr(\
-                                ctx.expression()), args)
+        self.map[ctx] = FuncallNode(self.get_expr(
+            ctx.expression()), args)
 
     def exitNewExpr(self, ctx):
-        self.map[ctx] = self.map.get(ctx.creator())
-    
+        if ctx.creator() in self.map:
+            self.map[ctx] = self.map[ctx.creator()]
+        else:
+            self.map[ctx] = None
+
     def exitSuffixExpr(self, ctx):
         op = None
         text = ctx.op.text
@@ -181,9 +224,9 @@ class ASTBuilder(MalicListener):
         elif text == '--':
             op = UnaryOpNode.UnaryOp.SUF_DEC
         else:
-            raise InternalError('Invalid token ' + text)
-        self.map[ctx] = SuffixOpNode(op, \
-                    self.get_expr(ctx.expression()))
+            raise SemanticError(Location(ctx), 'Invalid token ' + text)
+        self.map[ctx] = SuffixOpNode(op,
+                                     self.get_expr(ctx.expression()))
 
     def exitPrefixExpr(self, ctx):
         op = None
@@ -200,10 +243,12 @@ class ASTBuilder(MalicListener):
             op = UnaryOpNode.UnaryOp.BIT_NOT
         elif text == '!':
             op = UnaryOpNode.UnaryOp.LOGIC_NOT
+        elif text == '~':
+            op = UnaryOpNode.UnaryOp.BIT_NOT
         else:
-            raise InternalError('Invalid token ' + text)
-        self.map[ctx] = PrefixOpNode(op, \
-                    self.get_expr(ctx.expression()))
+            raise SemanticError(Location(ctx), 'Invalid token ' + text)
+        self.map[ctx] = PrefixOpNode(op,
+                                     self.get_expr(ctx.expression()))
 
     def exitBinaryExpr(self, ctx):
         op = None
@@ -242,40 +287,50 @@ class ASTBuilder(MalicListener):
             op = BinaryOpNode.BinaryOp.BIT_OR
         else:
             raise InternalError('Invalid token ' + text)
-        self.map[ctx] = BinaryOpNode(self.get_expr(ctx.expression(0)),\
-                            op, self.get_expr(ctx.expression(1)))
+        self.map[ctx] = BinaryOpNode(self.get_expr(ctx.expression(0)),
+                                     op, self.get_expr(ctx.expression(1)))
+
     def exitLogicalAndExpr(self, ctx):
-        self.map[ctx] = LogicalAndNode(self.get_expr(ctx.expression(0)),\
-                            self.get_expr(ctx.expression(1)))
-    
+        self.map[ctx] = LogicalAndNode(self.get_expr(ctx.expression(0)),
+                                       self.get_expr(ctx.expression(1)))
+
     def exitLogicalOrExpr(self, ctx):
-        self.map[ctx] = LogicalOrNode(self.get_expr(ctx.expression(0)),\
-                            self.get_expr(ctx.expression(1)))
+        self.map[ctx] = LogicalOrNode(self.get_expr(ctx.expression(0)),
+                                      self.get_expr(ctx.expression(1)))
+
     def exitSubExpr(self, ctx):
         self.map[ctx] = self.map.get(ctx.expression())
+
     def exitThisExpr(self, ctx):
         self.map[ctx] = VariableNode(Location(ctx), 'this')
+
     def exitVariableExpr(self, ctx):
-        self.map[ctx] = VariableNode(Location(ctx.Identifier()),
-                            ctx.Identifier().getText())
+        self.map[ctx] = VariableNode(Location(ctx),
+                                     ctx.Identifier().getText())
+
     def exitLiteralExpr(self, ctx):
         self.map[ctx] = self.map.get(ctx.literal())
+
     def exitDecIntegerConst(self, ctx):
-        self.map[ctx] = IntegerLiteralNode(Location(ctx), 
-            int(ctx.DecimalInteger().getText()))
+        self.map[ctx] = IntegerLiteralNode(Location(ctx),
+                                           int(ctx.DecimalInteger().getText()))
+
     def exitStringConst(self, ctx):
-        value = ctx.StringLiteral().text
+        value = ctx.StringLiteral().getText()
         value = value[1:len(value) - 1]
         self.map[ctx] = StringLiteralNode(Location(ctx), value)
+
     def exitBoolConst(self, ctx):
-        self.map[ctx] = BoolLiteralNode(Location(ctx), 
-            ctx.value.text == 'true')
+        self.map[ctx] = BoolLiteralNode(Location(ctx),
+                                        ctx.value.text == 'true')
+
     def exitNullConst(self, ctx):
         self.map[ctx] = VariableNode(Location(ctx), 'null')
+
     def exitArrayCreator(self, ctx):
         base_type = None
         if ctx.Identifier() != None:
-            base_type = ClassType(ctx.Identifier().text)
+            base_type = ClassType(ctx.Identifier().getText())
         else:
             base_type = self.map.get(ctx.primitiveType())
         exprs = ctx.expression()
@@ -284,18 +339,22 @@ class ASTBuilder(MalicListener):
         expr_nodes = []
         for item in exprs:
             expr_nodes.append(self.get_expr(item))
-        self.map[ctx] = CreatorNode(Location(ctx), \
-                            type, expr_nodes, dimension)
+        self.map[ctx] = CreatorNode(Location(ctx),
+                                    type, expr_nodes, dimension)
+
     def exitErrorCreator(self, ctx):
         raise SemanticError(Location(ctx), 'Invalid creator expression')
-    def exitNonArrayCretor(self, ctx):
-        type = ClassType(ctx.Indentifier().text)
+
+    def exitNonarrayCreator(self, ctx):
+        type = ClassType(ctx.Identifier().getText())
         self.map[ctx] = CreatorNode(Location(ctx), type, None, 0)
+
     def get_stmt(self, ctx):
         if ctx == None:
             return None
         else:
             return self.map[ctx]
+
     def get_expr(self, ctx):
         if ctx == None:
             return None

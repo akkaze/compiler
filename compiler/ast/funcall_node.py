@@ -1,15 +1,16 @@
-from compiler.type import FunctionType, Type
-from compiler.ast import ExprNode
+from compiler.typ.function_type import FunctionType
+from compiler.ast.expr_node import ExprNode
+
 
 class FuncallNode(ExprNode):
-    expr = None
-    args = None
+
     def __init__(self, expr, args):
+        super().__init__()
         self.expr = expr
         self.args = args
-        super().__init__()
-
+        
     def add_thispointer(self, expr):
+        assert isinstance(expr, ExprNode)
         self.args.insert(0, expr)
 
     @property
@@ -22,7 +23,19 @@ class FuncallNode(ExprNode):
 
     @property
     def location(self):
-        return self.location
-    
+        return self.expr.location
+
+    @property
+    def callee_name(self):
+        return self.expr.entity.name
+        
     def accept(self, visitor):
         return visitor.visit(self)
+
+    def __str__(self):
+        funcall_str =  str(self.expr) + '('
+        for i, arg in enumerate(self.args):
+            funcall_str += str(arg)
+            if i != len(self.args) - 1:
+                funcall_str += ','
+        return funcall_str

@@ -1,8 +1,9 @@
 from compiler.ast import Node
 
 class StmtNode(Node):
-    location = None
     def __init__(self, loc):
+        super().__init__()
         self.location = loc
+        
     def accept(self, visitor):
         pass

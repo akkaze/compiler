@@ -1,9 +1,11 @@
 from compiler.ins.operand import Operand, Register
-from compiler.utils import InternalError
+from compiler.utils.internal_error import InternalError
 from enum import Enum
 import sys
 
 GLOBAL_PREFIX = '__global__'
+
+
 class Reference(Operand):
     class Type(Enum):
         GLOBAL = 1
@@ -14,25 +16,15 @@ class Reference(Operand):
         CANNOT_COLOR = 6
         SPECIAL = 7
 
-
-    type = None
-    name = ''
-    reg = None
-    offset = 0
-    entity = None
-    ref_times = 0
-
-    adj_list = None
-    degree = 0
-    alias = None
-    color = None
-    move_list = None
-    is_precolored = False
-    is_spilled = False
-
     def __init__(self, *args):
         self.move_list = set()
         self.adj_list = set()
+        self.entity = None
+        self.is_precolored = False
+        self.ref_times = 0
+        self.degree = 0
+        self.alias = None
+        self.color = None
         if len(args) == 2:
             if isinstance(args[0], str):
                 self.name = args[0]
@@ -48,6 +40,7 @@ class Reference(Operand):
                 self.name = args[0].name
                 self.entity = args[0]
                 self.type = Reference.Type.UNKNOWN
+
     def reset(self):
         self.ref_times = 0
         self.move_list = set()
@@ -59,22 +52,29 @@ class Reference(Operand):
             self.degree = sys.maxsize
         self.alias = None
         self.is_spilled = False
+
     @property
     def can_be_accumulator(self):
         return self.type == Reference.Type.UNKNOWN \
-                and self.entity is None
+            and self.entity is None
 
     def set_offset(self, offset, reg):
         self.offset = offset
         self.reg = reg
         self.type = Reference.Type.OFFSET
+
     def set_register(self, reg):
         self.reg = reg
         self.type = Reference.Type.REG
+
+    @property
+    def is_offset(self):
+        return self.type == Reference.Type.OFFSET
+
     @property
     def is_unknown(self):
         return self.type == Reference.Type.UNKNOWN \
-                and self.color is None
+            and self.color is None
 
     def replace(self, ffrom, to):
         if self == ffrom:
@@ -93,39 +93,44 @@ class Reference(Operand):
             elif self.type == Reference.Type.GLOBAL:
                 return self.name == o.name
             elif self.type == Reference.Type.UNKNOWN:
-                return hash(self) == hash(o)
+                return id(self) == id(o)
             else:
                 raise InternalError('Unhandled case in reference.eq')
         return False
+
     def __hash__(self):
         hash_code = None
         if self.type == Reference.Type.REG:
             hash_code = hash(self.reg)
         elif self.type == Reference.Type.OFFSET:
             hash_code = hash(self.reg)
-            hash_code *=  hash(self.offset)
+            hash_code *= hash(self.offset)
         else:
             hash_code = hash(self.name)
         return hash_code
+
     def get_all_ref(self):
         ret = set()
         if self.type != Reference.Type.GLOBAL and \
-            self.type != Reference.Type.CANNOT_COLOR and \
-            self.type != Reference.Type.SPECIAL:
+                self.type != Reference.Type.CANNOT_COLOR and \
+                self.type != Reference.Type.SPECIAL:
             ret.add(self)
         return ret
 
     @property
     def is_register(self):
         return self.type == Reference.Type.REG
+
     @property
     def is_direct(self):
         return True
+
     @property
     def is_address(self):
         return self.type == Reference.Type.GLOBAL or \
             self.type == Reference.Type.OFFSET or \
             self.type == Reference.Type.CANNOT_COLOR
+
     @property
     def nasm(self):
         if self.type == Reference.Type.GLOBAL:
@@ -139,6 +144,9 @@ class Reference(Operand):
         elif self.type == Reference.Type.SPECIAL:
             return self.name
         else:
-            raise InternalError('Unallocated reference ' + self.name)
+            raise InternalError(-1, 'Unallocated reference ' + self.name)
+
     def __str__(self):
         return self.name
+    # def __repr__(self):
+    #     return self.name

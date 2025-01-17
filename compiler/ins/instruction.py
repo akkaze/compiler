@@ -1,23 +1,18 @@
 from abc import ABC, abstractmethod
 
 class Instruction(ABC):
-    predecessor = None
-    successor = None
-
-    iin = None
-    out = None
-
-    m_use = None
-    m_ddef = None
-
-    m_all_ref = None
-    live = None
-
+    id = 0
     def __init__(self):
         self.predecessor = []
         self.successor = []
-        self.iin = dict()
-        self.out = dict()
+        self.iin = set()
+        self.out = set()
+        self.m_use = set()
+        self.m_ddef = set()
+        self.m_all_ref = set()
+        self.m_live = set()
+        self.id = Instruction.id
+        Instruction.id += 1
     
     @abstractmethod
     def replace_use(self, ffrom, to):
@@ -64,17 +59,17 @@ class Instruction(ABC):
     
     @property
     def live(self):
-        if not self.live:
-            live = dict()
+        if not self.m_live:
+            self.m_live = set()
             for ref in self.iin:
                 if ref.alias:
-                    self.live.append(ref.alias)
+                    self.m_live.add(ref.alias)
                 else:
-                    self.live.append(ref)
+                    self.m_live.add(ref)
             for ref in self.out:
                 if ref.alias:
-                    self.live.append(ref.alias)
+                    self.m_live.add(ref.alias)
                 else:
-                    self.live.apend(ref)
+                    self.m_live.add(ref)
 
-        return self.live 
+        return self.m_live 

@@ -1,12 +1,8 @@
 from compiler.utils import SemanticError
-from compiler.entity import VariableEntity, FunctionEntity
+from compiler.entity.variable_entity import VariableEntity
+from compiler.entity.function_entity import FunctionEntity
 
 class Scope(object):
-    entities = None
-    children = None
-    parent = None
-    is_top_level = False
-    
     def __init__(self, arg):
         self.children = []
         self.entities = dict()
@@ -19,30 +15,30 @@ class Scope(object):
                 self.parent.add_children(self)
     
     def insert(self, entity):
-        if self.entities.get(entity.name):
-            raise SemanticError(entity.location, "duplicated symbol:" \
-                                + entity.name)
+        if entity.name in self.entities:
+            raise SemanticError(entity.location, "duplicated symbol:" + entity.name)
         self.entities[entity.name] = entity
     
     def lookup(self, name):
-        entity = self.entities.get(name)
-        if not entity:
+        if name not in self.entities:
             if self.is_top_level:
                 return None
             else:
                 return self.parent.lookup(name)
         else:
-            return entity
+            return self.entities[name]
     
     def lookup_current_level(self, name):
-        return self.entities.get(name)
+        if name not in self.entities:
+            return None
+        return self.entities[name]
     
     def add_children(self, s):
         return self.children.append(s)
     
     def locate_local_variable(self, base, align):
         offset = 0
-        for name, entity in self.entities.items():
+        for entity in self.entities.values():
             if isinstance(entity, VariableEntity):
                 offset += entity.type.size
                 entity.offset = offset + base
@@ -58,7 +54,7 @@ class Scope(object):
     # set offset in class 
     def locate_member(self, align):
         offset = 0
-        for name, entity in self.entities.items():
+        for entity in self.entities.values():
             if not isinstance(entity, FunctionEntity):
                 entity.offset = offset
                 offset += entity.size
@@ -68,16 +64,17 @@ class Scope(object):
     # all variable entities
     def all_local_variables(self):
         ret = []
-        for name, entity in self.entities.items():
+        for entity in self.entities.values():
             if isinstance(entity, VariableEntity):
                 ret.append(entity)
         for child in self.children:
             ret.extend(child.all_local_variables())
         return ret
+
     # all entities
     def gather_all(self):
         ret = []
-        for name, entity in self.entities.items():
+        for entity in self.entities.values():
             if isinstance(entity, FunctionEntity):
                 if not entity.is_libfunction:
                     ret.extend(entity.params)

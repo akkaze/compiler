@@ -1,15 +1,13 @@
 from compiler.ins import Instruction
-
+from compiler.ins.operand.reference import Reference
 class Lea(Instruction):
-    dest = None
-    addr = None
     def __init__(self, dest, addr):
         self.dest = dest
         self.addr = addr
         super().__init__()
     def replace_use(self, ffrom, to):
         self.addr = self.addr.replace(ffrom, to)
-        if self.dest != self.ffrom:
+        if self.dest != ffrom:
             self.dest = self.dest.replace(ffrom, to)
     def replace_def(self, ffrom, to):
         self.dest = self.dest.replace(ffrom, to)
@@ -26,4 +24,4 @@ class Lea(Instruction):
         return translator.visit(self)
  
     def __str__(self):
-        return 'lea ' + str(dest) + ', ' + str(addr)
+        return 'lea ' + str(self.dest) + ', ' + str(self.addr)

@@ -1,7 +1,6 @@
-from compiler.ir import Expr
+from compiler.ir.expr import Expr
 
 class Var(Expr):
-    entity = None
     def __init__(self, entity):
         self.entity = entity
     def accept(self, emitter):

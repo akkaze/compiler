@@ -11,8 +11,7 @@ class Move(Instruction):
         super().__init__()
     @property
     def is_ref_move(self):
-        if isinstance(self.dest, Reference) and \
-            isinstance(self.src, Reference):
+        if isinstance(self.dest, Reference) and isinstance(self.src, Reference):
             type1 = self.src.type
             type2 = self.dest.type
             if (type1 == Reference.Type.UNKNOWN or \
@@ -24,7 +23,7 @@ class Move(Instruction):
 
     def replace_use(self, ffrom, to):
         self.src = self.src.replace(ffrom, to)
-        if not isinstance(dest, Reference):
+        if not isinstance(self.dest, Reference):
             self.dest = self.dest.replace(ffrom, to)
     def replace_def(self, ffrom, to):
         self.dest = self.dest.replace(ffrom, to)
@@ -47,4 +46,5 @@ class Move(Instruction):
         return translator.visit(self)
  
     def __str__(self):
-        return 'mov ' + str(self.dest) + ', ' + str(self.src)
+        s =  'mov ' + str(self.dest) + ', ' + str(self.src)
+        return s

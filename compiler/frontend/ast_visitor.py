@@ -1,5 +1,11 @@
 from compiler.ast import *
 from compiler.entity import *
+from compiler.ast.block_node import BlockNode
+from compiler.ast.if_node import IfNode
+from compiler.ast.while_node import WhileNode
+from compiler.ast.for_node import ForNode
+from compiler.ast.functiondef_node import FunctionDefNode
+from compiler.ast.stringliteral_node import StringLiteralNode
 
 class ASTVisitor(object):
     def visit_stmt(self, stmt):
@@ -93,7 +99,7 @@ class ASTVisitor(object):
             self.visit_expr(node.index)
             return
         elif isinstance(node, CreatorNode):
-            if self.exprs:
+            if node.exprs:
                 self.visit_exprs(node.exprs)
             return
         elif isinstance(node, MemberNode):

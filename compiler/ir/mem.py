@@ -1,7 +1,6 @@
-from compiler.ir import Expr
+from compiler.ir.expr import Expr
 
 class Mem(Expr):
-    expr = None
 
     def __init__(self, expr):
         self.expr = expr

@@ -20,3 +20,6 @@ class Pop(Instruction):
  
     def __str__(self):
         return 'pop ' + str(self.operand)
+
+    def __repr__(self):
+        return 'pop ' + str(self.operand)

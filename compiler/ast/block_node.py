@@ -1,10 +1,5 @@
-from compiler.ast import StmtNode
-from compiler.entity import Scope
-
+from compiler.ast.stmt_node import StmtNode
 class BlockNode(StmtNode):
-    stmts = []
-    scope = None
-
     def __init__(self, loc, stmts):
         super().__init__(loc)
         self.stmts = stmts
